@@ -66,7 +66,7 @@
   .actions { display:flex; gap:8px; margin-top:14px; flex-wrap:wrap; }
   .actions .ok { background:var(--acc); color:#fff; border-color:var(--acc); font-weight:650; flex:1; }
   canvas#mn { max-width:100%; height:auto; cursor:crosshair; border:1px solid var(--line); border-radius:8px; }
-  .result img { width:100%; border:1px solid var(--line); border-radius:6px; box-shadow:0 4px 18px rgba(0,0,0,.06); }
+  .result img { width:100%; max-width:720px; display:block; border:1px solid var(--line); border-radius:6px; box-shadow:0 4px 18px rgba(0,0,0,.06); }
   .sent { margin-top:12px; padding:10px 12px; background:#e6f4f1; border-radius:8px; color:#0a5a52; display:flex; justify-content:space-between; align-items:center; }
   .legendhint { display:flex; gap:14px; font-size:12px; color:var(--mute); margin-bottom:8px; }
   .legendhint b.od { color:var(--od); } .legendhint b.og { color:var(--og); }
@@ -83,7 +83,7 @@
   .chips label { flex:1; } .chips input { display:none; }
   .chips span { display:block; text-align:center; padding:6px 4px; border:1px solid #cfd4dc; border-radius:999px; font-size:12.5px; cursor:pointer; user-select:none; }
   .chips input:checked + span { background:var(--acc); border-color:var(--acc); color:#fff; font-weight:600; }
-  #mini { margin-top:8px; } #mini img { width:100%; border:1px solid var(--line); border-radius:6px; cursor:zoom-in; display:block; }
+  #mini { margin-top:8px; } #mini img { max-height:340px; object-fit:contain; } #mini img { width:100%; border:1px solid var(--line); border-radius:6px; cursor:zoom-in; display:block; }
   .review { grid-template-columns:minmax(0,1fr) 360px; }
   #clickhint { display:none; }
   body.need-click #clickhint { display:flex; position:fixed; inset:0; z-index:50; background:rgba(20,28,38,.55); align-items:center; justify-content:center; cursor:pointer; }
@@ -124,7 +124,7 @@
   body.popup ul#list li { padding:3px 6px; font-size:12px; } body.popup ul#list input.lb { padding:2px 4px; }
   body.popup .status { font-size:11.5px; padding:6px 8px; min-height:0; }
   body.popup #empty { padding:6px; font-size:11.5px; }
-  body.popup #mini img { max-height:200px; object-fit:contain; }
+  body.popup #mini img { max-height:260px; object-fit:contain; }
   body.popup details { font-size:11.5px; } body.popup .grid2 { grid-template-columns:1fr 54px; }
   body.popup main { display:none; }
   body.popup.pip-open main { display:block; padding:10px; }
@@ -195,12 +195,13 @@
     Elle s'agrandit toute seule pour vérifier un examen ou montrer le PDF.
   </section>
   <section id="installnote" class="panel">
-    <b>Le plus simple sous Windows :</b> téléchargez le <a href="Audiogrammes-lanceur.zip">lanceur</a>, dézippez-le et placez
-    <b>Audiogrammes.cmd</b> sur le bureau. Un double-clic ouvre l'outil seul, sans onglet, dans sa petite fenêtre en haut à droite,
-    qui reste au premier plan même au-dessus de Doctolib.<br><br>
-    <b>Sinon, pour ne plus avoir d'onglet :</b> installez l'outil comme une application — icône <b>⊕ Installer</b> à droite de la barre d'adresse
-    (ou menu ⋮ › Caster, enregistrer et partager › Installer la page en tant qu'appli). Une icône « Audiogrammes » apparaît alors sur le bureau :
-    elle ouvre l'outil directement dans sa petite fenêtre, en haut à droite, sans onglet.
+    <b>Installation sous Windows (une seule fois) :</b>
+    <ol style="margin:6px 0 0;padding-left:20px">
+      <li>Installez l'outil comme application : icône <b>⊕ Installer</b> à droite de la barre d'adresse de Chrome.
+        Il aura sa propre icône (et non celle de Chrome) dans la barre des tâches.</li>
+      <li>Téléchargez le <a href="Audiogrammes-lanceur.zip">lanceur</a>, dézippez-le et double-cliquez sur <b>Installer.cmd</b> :
+        une icône Audiogrammes est créée sur le bureau, et la fenêtre de l'outil reste toujours au premier plan, même au-dessus de Doctolib.</li>
+    </ol>
   </section>
   <section id="p-help" class="panel help">
     <h2>Mode d'emploi</h2>
@@ -985,7 +986,7 @@ if (typeof module !== "undefined") module.exports = AG;
         cv.width = Math.round(vp.width); cv.height = Math.round(vp.height);
         const ctx = cv.getContext("2d"); ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, cv.width, cv.height);
         await page.render({ canvasContext: ctx, viewport: vp }).promise;
-        if (await processCanvas(cv, { fileName: file.name || "", auto })) ok = true;
+        if (await processCanvas(cv, { fileName: file.name || "", auto, page: true })) ok = true;
       }
       return ok;
     } catch (e) { status("PDF illisible : " + e.message, "err"); return false; }
@@ -1028,7 +1029,7 @@ if (typeof module !== "undefined") module.exports = AG;
         info = { name: info.name || o.name, nom: info.nom || o.nom, prenom: info.prenom || o.prenom, date: info.date || o.date, dob: o.dob };
       } catch (e) {}
     }
-    return place({ ...data, canvas: res.canvas || cv, grids: res.grids, vgrid: res.vgridV || res.vgrid, vcanvas: res.vcanvas || res.canvas || cv }, info);
+    return place({ ...data, page: !!meta.page, canvas: res.canvas || cv, grids: res.grids, vgrid: res.vgridV || res.vgrid, vcanvas: res.vcanvas || res.canvas || cv }, info);
   }
 
   const normName = s => (s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().replace(/[^A-Z]/g, "");
@@ -1442,9 +1443,12 @@ if (typeof module !== "undefined") module.exports = AG;
     }
     c.strokeStyle = "#555"; c.lineWidth = 0.8 * k; c.strokeRect(x, y, w, h);
     c.textAlign = "center"; c.textBaseline = "alphabetic";
-    font(c, k, 12, true); c.fillStyle = EAR_COL[ear];
-    const what = opts.air && opts.bone ? " — aérienne et osseuse" : opts.bone ? " — conduction osseuse" : "";
-    c.fillText(EAR_NAME[ear] + what, x + w / 2, y - 7 * k);
+    if (opts.titles) { font(c, k, 11, true); c.fillStyle = "#000"; c.fillText(opts.titles[ear], x + w / 2, y - 6 * k); }
+    else {
+      font(c, k, 12, true); c.fillStyle = EAR_COL[ear];
+      const what = opts.air && opts.bone ? " — aérienne et osseuse" : opts.bone ? " — conduction osseuse" : "";
+      c.fillText(EAR_NAME[ear] + what, x + w / 2, y - 7 * k);
+    }
     font(c, k, 8); c.fillStyle = "#333";
     c.fillText("Fréquence (Hz)", x + w / 2, y + h + 20 * k);
 
@@ -1484,7 +1488,7 @@ if (typeof module !== "undefined") module.exports = AG;
     c.strokeStyle = "#888"; c.lineWidth = 0.9 * k; c.beginPath(); c.moveTo(x, PY(50)); c.lineTo(x + w, PY(50)); c.stroke();
     c.strokeStyle = "#555"; c.lineWidth = 0.8 * k; c.strokeRect(x, y, w, h);
     c.textAlign = "center"; c.textBaseline = "alphabetic";
-    font(c, k, 12, true); c.fillStyle = "#333"; c.fillText("Audiométrie vocale", x + w / 2, y - 7 * k);
+    font(c, k, 11, true); c.fillStyle = "#000"; c.fillText("vocale", x + w / 2, y - 6 * k);
     font(c, k, 8); c.fillText("Intensité (dB)", x + w / 2, y + h + 20 * k);
     c.save(); c.translate(x - 24 * k, y + h / 2); c.rotate(-Math.PI / 2); c.fillText("Intelligibilité (%)", 0, 0); c.restore();
     const n = list.length, legend = [];
@@ -1532,9 +1536,23 @@ if (typeof module !== "undefined") module.exports = AG;
     rows.forEach((r, i) => drawRow(r.cells, ty + rh * (i + 1), r.bg, false));
   }
 
+  // Page A4 portrait, même mise en page que les audiogrammes de l'audiomètre
+  // (reconnus tels quels par Doctolib) : en-tête Nom / Prénom / Date de naissance,
+  // date, graphiques DROITE et GAUCHE, vocale en dessous.
+  const JOURS = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
+  const MOIS_L = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
+  function headerSource(list) {
+    // en-tête de la page d'origine la plus récente (si c'est bien une page A4 portrait)
+    for (let i = list.length - 1; i >= 0; i--) {
+      const cv = list[i].canvas || list[i].vcanvas;
+      if (cv && list[i].page && Math.abs(cv.width / cv.height - 595 / 842) < 0.02) return cv;
+    }
+    return null;
+  }
   function renderPage(list, who, opts, k = 200 / 72) {
+    const PW = 595, PH = 842;
     const cv = document.createElement("canvas");
-    cv.width = Math.round(842 * k); cv.height = Math.round(595 * k);
+    cv.width = Math.round(PW * k); cv.height = Math.round(PH * k);
     const c = cv.getContext("2d");
     c.fillStyle = "#fff"; c.fillRect(0, 0, cv.width, cv.height);
     const A = opts.air || opts.bone, V = opts.voc;
@@ -1542,19 +1560,31 @@ if (typeof module !== "undefined") module.exports = AG;
     const allv = list.flatMap(a => keys.flatMap(e => Object.values(a[e] || {})));
     const allf = [...new Set(list.flatMap(a => keys.flatMap(e => Object.keys(a[e] || {}).map(Number))))].sort((p, q) => p - q);
     const rng = { fmin: Math.min(125, ...allf), fmax: Math.max(8000, ...allf), dbmin: Math.min(-10, ...allv), dbmax: Math.max(120, ...allv) };
-    // en-tête au format reconnu par l'import Doctolib : Nom, Prénom, Date de naissance, puis « Audiogramme »
-    const today = new Date().toLocaleDateString("fr-FR");
-    c.fillStyle = "#111"; c.textAlign = "left"; font(c, k, 10.5, true);
-    const idLine = [`Nom : ${who.nom || "—"}`, `Prénom : ${who.prenom || "—"}`, who.dob ? `Date de naissance : ${who.dob}` : ""].filter(Boolean);
-    let ix = 30 * k;
-    for (const s of idLine) { c.fillText(s, ix, 17 * k); ix += c.measureText(s).width + 22 * k; }
-    c.textAlign = "center"; font(c, k, 16, true);
-    c.fillText("Audiogramme", cv.width / 2, 33 * k);
-    font(c, k, 8); c.fillStyle = "#666";
-    const shown = [opts.air && "aérienne", opts.bone && "osseuse", opts.voc && "vocale"].filter(Boolean).join(", ") || "aucune courbe";
-    c.fillText(`Comparaison de ${list.length} examen(s) : ${list.map(a => a.label).join(", ")} — ${shown} — du plus ancien (clair) au plus récent (foncé) — édité le ${today}`, cv.width / 2, 44 * k, 780 * k);
+    const now = new Date(), today = now.toLocaleDateString("fr-FR");
 
-    // tableau des seuils
+    // --- en-tête : celui de l'audiomètre si disponible, sinon redessiné à l'identique
+    const src = headerSource(list);
+    if (src) {
+      // jusqu'à 69 pt (adresse complète), en effaçant le début de la date d'origine à gauche
+      const sh = src.height * 69 / PH;
+      c.drawImage(src, 0, 0, src.width, sh, 0, 0, cv.width, 69 * k);
+      c.fillStyle = "#fff"; c.fillRect(0, 60 * k, 225 * k, 10 * k);
+    } else {
+      c.strokeStyle = "#333"; c.lineWidth = 0.8 * k;
+      c.beginPath(); c.roundRect(16 * k, 8 * k, 193 * k, 45 * k, 5 * k); c.stroke();
+      c.fillStyle = "#000"; c.textAlign = "center"; font(c, k, 9.5, true);
+      c.fillText(`Nom ${who.nom || ""}`, 112 * k, 21 * k);
+      c.fillText(`Prénom ${who.prenom || ""}`, 112 * k, 33 * k);
+      c.fillText(`Date de naissance ${who.dob || ""}`, 112 * k, 45 * k);
+      font(c, k, 12, true); c.fillText("AUDIOGRAMME", 498 * k, 26 * k);
+    }
+    c.textAlign = "left"; c.fillStyle = "#000"; font(c, k, 17);
+    c.fillText(`${JOURS[now.getDay()]} ${now.getDate()} ${MOIS_L[now.getMonth()]} ${now.getFullYear()}`, 17 * k, 82 * k);
+    font(c, k, 7.5); c.fillStyle = "#555";
+    const shown = [opts.air && "aérienne", opts.bone && "osseuse", opts.voc && "vocale"].filter(Boolean).join(", ") || "aucune courbe";
+    c.fillText(`Superposition de ${list.length} examen(s) : ${list.map(a => a.label).join(", ")} (du plus clair au plus foncé) — ${shown}`, 18 * k, 97 * k, 560 * k);
+
+    // --- tableau des seuils
     const rows = [];
     for (const a of list) for (const e of AG.EARS) for (const [on, key, typ] of [[opts.air, e, "CA"], [opts.bone, BONE[e], "CO"]]) {
       const v = a[key] || {};
@@ -1566,38 +1596,32 @@ if (typeof module !== "undefined") module.exports = AG;
     const head = ["Examen", "Or.", "", ...allf.map(flabel), "Perte moy."];
     const text = [`Nom ${who.nom || ""}`, `Prénom ${who.prenom || ""}`, ...(who.dob ? [`Date de naissance ${who.dob}`] : []), "Audiogramme",
       `Date ${today}`, head.join(" | "), ...rows.map(r => r.cells.join(" | "))];
-
-    if (A && !V) {
-      drawChart(c, k, 62 * k, 66 * k, 330 * k, 255 * k, "right", list, rng, opts);
-      drawChart(c, k, 470 * k, 66 * k, 330 * k, 255 * k, "left", list, rng, opts);
-      yLabel(c, k, 26, 66 + 127); yLabel(c, k, 434, 66 + 127);
-      drawTable(c, k, 30 * k, 366 * k, 782 * k, 190 * k, head, rows, [100, 26, 24]);
-    } else if (A && V) {
-      drawChart(c, k, 62 * k, 62 * k, 330 * k, 196 * k, "right", list, rng, opts);
-      drawChart(c, k, 470 * k, 62 * k, 330 * k, 196 * k, "left", list, rng, opts);
-      yLabel(c, k, 26, 62 + 98); yLabel(c, k, 434, 62 + 98);
-      drawVocale(c, k, 62 * k, 312 * k, 330 * k, 196 * k, list);
-      drawTable(c, k, 430 * k, 312 * k, 382 * k, 240 * k, head, rows, [70, 20, 20]);
-    } else if (V) {
-      drawVocale(c, k, 110 * k, 66 * k, 622 * k, 330 * k, list);
-      const vr = [];
-      for (const a of list) for (const e of AG.EARS) {
-        const pts = a[VOC[e]] || [];
-        if (pts.length) vr.push({ bg: e === "right" ? "#fdecea" : "#e8f0fd", cells: [a.label, e === "right" ? "OD" : "OG", pts.map(([d, p]) => `${d} dB : ${p} %`).join("   ")] });
-      }
-      drawTable(c, k, 30 * k, 440 * k, 782 * k, 120 * k, ["Examen", "Or.", "Audiométrie vocale"], vr, [110, 30]);
-      for (const r of vr) text.push(r.cells.join(" | "));
-    } else {
-      font(c, k, 12); c.fillStyle = "#999"; c.fillText("Cochez au moins une courbe : aérienne, osseuse ou vocale.", cv.width / 2, cv.height / 2);
-    }
-    if (V && A) for (const a of list) for (const e of AG.EARS) {
+    const vrows = [];
+    for (const a of list) for (const e of AG.EARS) {
       const pts = a[VOC[e]] || [];
-      if (pts.length) text.push(`${a.label} | ${e === "right" ? "OD" : "OG"} | vocale | ` + pts.map(([d, p]) => `${d} dB: ${p} %`).join(", "));
+      if (pts.length) vrows.push({ bg: e === "right" ? "#fdecea" : "#e8f0fd", cells: [a.label, e === "right" ? "OD" : "OG", pts.map(([d, p]) => `${d} dB : ${p} %`).join("   ")] });
     }
-    c.textAlign = "left"; c.textBaseline = "alphabetic"; c.fillStyle = "#777"; font(c, k, 6.5);
-    c.fillText("CA = conduction aérienne, CO = conduction osseuse. Perte moyenne : moyenne 500, 1000, 2000 et 4000 Hz (BIAP). Valeurs lues automatiquement à l'écran.",
-      30 * k, 584 * k);
-    return { canvas: cv, text };
+
+    // --- graphiques, aux mêmes emplacements que sur l'audiogramme d'origine
+    const o2 = { ...opts, titles: { right: "DROITE", left: "GAUCHE" } };
+    if (A) {
+      drawChart(c, k, 34 * k, 127 * k, 241 * k, 265 * k, "right", list, rng, o2);
+      drawChart(c, k, 345 * k, 127 * k, 244 * k, 265 * k, "left", list, rng, o2);
+      if (V) {
+        drawVocale(c, k, 101 * k, 440 * k, 387 * k, 152 * k, list);
+        drawTable(c, k, 20 * k, 640 * k, 555 * k, 150 * k, head, rows, [62, 20, 20]);
+      } else drawTable(c, k, 20 * k, 440 * k, 555 * k, 330 * k, head, rows, [62, 20, 20]);
+    } else if (V) {
+      drawVocale(c, k, 60 * k, 127 * k, 500 * k, 265 * k, list);
+      drawTable(c, k, 20 * k, 440 * k, 555 * k, 200 * k, ["Examen", "Or.", "Audiométrie vocale"], vrows, [70, 22]);
+    } else {
+      font(c, k, 12); c.fillStyle = "#999"; c.textAlign = "center";
+      c.fillText("Cochez au moins une courbe : aérienne, osseuse ou vocale.", cv.width / 2, cv.height / 2);
+    }
+    for (const r of vrows) text.push(r.cells.join(" | "));
+    c.textAlign = "left"; c.textBaseline = "alphabetic"; c.fillStyle = "#777"; font(c, k, 6);
+    c.fillText("CA = conduction aérienne, CO = conduction osseuse. Perte moyenne : moyenne 500, 1000, 2000 et 4000 Hz (BIAP).", 20 * k, 830 * k);
+    return { canvas: cv, text, pw: PW, ph: PH };
   }
   function yLabel(c, k, x, y) {
     c.save(); c.translate(x * k, y * k); c.rotate(-Math.PI / 2);
@@ -1618,7 +1642,7 @@ if (typeof module !== "undefined") module.exports = AG;
   }
 
   // ------------------------------------------------------------ écriture PDF (sans bibliothèque)
-  function buildPdf(jpeg, iw, ih, title, lines) {
+  function buildPdf(jpeg, iw, ih, title, lines, PW = 842, PH = 595) {
     const enc = s => {
       const out = new Uint8Array(s.length);
       for (let i = 0; i < s.length; i++) { const c = s.charCodeAt(i); out[i] = c < 256 ? c : (c === 0x2014 || c === 0x2013 ? 45 : 63); }
@@ -1630,13 +1654,13 @@ if (typeof module !== "undefined") module.exports = AG;
     const put = b => { if (typeof b === "string") b = enc(b); chunks.push(b); pos += b.length; };
     put("%PDF-1.4\n%\xE2\xE3\xCF\xD3\n");
     const obj = (n, body) => { offs[n] = pos; put(`${n} 0 obj\n`); body(); put("\nendobj\n"); };
-    let content = "q 842 0 0 595 0 0 cm /Im0 Do Q\nBT 3 Tr /F1 6 Tf 20 585 Td 7 TL\n";
+    let content = `q ${PW} 0 0 ${PH} 0 0 cm /Im0 Do Q\nBT 3 Tr /F1 6 Tf 20 ${PH - 10} Td 7 TL\n`;
     for (const l of lines) content += `(${esc(l)}) '\n`;
     content += "ET";
     const cbytes = enc(content);
     obj(1, () => put("<< /Type /Catalog /Pages 2 0 R >>"));
     obj(2, () => put("<< /Type /Pages /Kids [3 0 R] /Count 1 >>"));
-    obj(3, () => put("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 842 595] /Resources << /XObject << /Im0 5 0 R >> /Font << /F1 6 0 R >> >> /Contents 4 0 R >>"));
+    obj(3, () => put(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PW} ${PH}] /Resources << /XObject << /Im0 5 0 R >> /Font << /F1 6 0 R >> >> /Contents 4 0 R >>`));
     obj(4, () => { put(`<< /Length ${cbytes.length} >>\nstream\n`); put(cbytes); put("\nendstream"); });
     obj(5, () => { put(`<< /Type /XObject /Subtype /Image /Width ${iw} /Height ${ih} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpeg.length} >>\nstream\n`); put(jpeg); put("\nendstream"); });
     obj(6, () => put("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>"));
@@ -1653,10 +1677,10 @@ if (typeof module !== "undefined") module.exports = AG;
   async function superpose(showIt = true) {
     if (!items.length) return;
     status("Création du PDF…", "busy");
-    const { canvas, text } = renderPage(items, ident, opts());
+    const { canvas, text, pw, ph } = renderPage(items, ident, opts());
     const jpegBlob = await new Promise(r => canvas.toBlob(r, "image/jpeg", 0.92));
     const jpeg = new Uint8Array(await jpegBlob.arrayBuffer());
-    const blob = buildPdf(jpeg, canvas.width, canvas.height, `${ident.nom} ${ident.prenom} Audiogramme`.trim(), text);
+    const blob = buildPdf(jpeg, canvas.width, canvas.height, `${ident.nom} ${ident.prenom} Audiogramme`.trim(), text, pw, ph);
     const d = new Date(), p2 = n => String(n).padStart(2, "0");
     // même convention que les fichiers de l'audiomètre : NOM_PRENOM_Audiogramme_AAAA-MM-JJ.pdf
     const up = s => safeName(s || "").toUpperCase();

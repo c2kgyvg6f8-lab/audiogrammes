@@ -1,15 +1,26 @@
 {
-  "name": "Audiogrammes superposés",
+  "name": "Audiogrammes",
   "short_name": "Audiogrammes",
   "description": "Superposition d'audiogrammes téléchargés et envoi vers Doctolib",
-  "start_url": "./",
+  "start_url": "./?fenetre=1",
   "scope": "./",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#0b7a6f",
   "lang": "fr",
   "icons": [
-    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
-  ]
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "id": "./"
 }
