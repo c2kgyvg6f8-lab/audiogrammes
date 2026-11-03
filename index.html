@@ -1,0 +1,1130 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Superposeur d'audiogrammes</title>
+<style>
+  :root { --od:#c62828; --og:#1565c0; --ink:#1d2430; --mute:#667085; --line:#e3e6eb; --bg:#f5f6f8;
+          --acc:#0b7a6f; --acc2:#0a6359; --card:#fff; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; }
+  body { font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; color:var(--ink); background:var(--bg); }
+  .wrap { display:grid; grid-template-columns:330px 1fr; min-height:100vh; }
+  aside { background:var(--card); border-right:1px solid var(--line); padding:18px 18px 24px; display:flex; flex-direction:column; gap:14px; }
+  main { padding:22px 26px; overflow:auto; }
+  h1 { font-size:17px; margin:0; letter-spacing:-.01em; }
+  h1 small { display:block; font-weight:400; color:var(--mute); font-size:12px; margin-top:2px; }
+  .step { font-size:11px; font-weight:700; color:var(--mute); text-transform:uppercase; letter-spacing:.06em; margin-bottom:6px; }
+  label.f { display:block; font-size:12px; color:var(--mute); margin-bottom:4px; }
+  input[type=text], input:not([type]), input[inputmode] { width:100%; padding:7px 9px; border:1px solid #cfd4dc; border-radius:7px; font:inherit; background:#fff; }
+  input:focus { outline:2px solid #9bd3cc; border-color:var(--acc); }
+  button { font:inherit; cursor:pointer; border-radius:8px; border:1px solid #cfd4dc; background:#fff; color:var(--ink); padding:7px 12px; }
+  button:hover:not(:disabled) { border-color:#9aa3b0; }
+  button:disabled { opacity:.45; cursor:default; }
+  .btn-main { width:100%; background:var(--acc); border-color:var(--acc); color:#fff; font-weight:650; font-size:15px; padding:11px 12px; }
+  .btn-main:hover:not(:disabled) { background:var(--acc2); }
+  .btn-wide { width:100%; }
+  .btn-send { width:100%; background:#1d2430; border-color:#1d2430; color:#fff; font-weight:650; padding:10px; }
+  .row { display:flex; gap:8px; align-items:center; }
+  .src { display:flex; gap:10px; align-items:center; margin-top:8px; }
+  .src video { width:110px; height:66px; background:#111; border-radius:6px; object-fit:contain; }
+  .src span { font-size:12px; color:var(--mute); }
+  .hint { font-size:12px; color:var(--mute); margin:6px 0 0; }
+  .chk { display:flex; gap:6px; align-items:center; font-size:12.5px; margin-top:8px; color:#444; }
+  ul#list { list-style:none; margin:0; padding:0; border:1px solid var(--line); border-radius:8px; max-height:240px; overflow:auto; }
+  ul#list li { display:flex; align-items:center; gap:8px; padding:6px 8px; border-bottom:1px solid var(--line); font-size:13px; }
+  ul#list li:last-child { border-bottom:0; }
+  ul#list .n { width:20px; height:20px; border-radius:50%; background:#eef1f4; display:grid; place-items:center; font-size:11px; font-weight:700; flex:none; }
+  ul#list .lb { flex:1; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  ul#list .pts { color:var(--mute); font-size:11.5px; }
+  ul#list .acts button { padding:1px 5px; font-size:11px; border-radius:5px; margin-left:1px; }
+  #empty { font-size:12.5px; color:var(--mute); padding:10px; border:1px dashed #cfd4dc; border-radius:8px; text-align:center; }
+  .status { overflow-wrap:anywhere; font-size:12.5px; padding:8px 10px; border-radius:8px; background:#f0f2f5; color:#444; min-height:34px; }
+  .status.ok { background:#e6f4f1; color:#0a5a52; } .status.err { background:#fdecea; color:#a1271f; } .status.busy { background:#fff7e0; color:#7a5800; }
+  .folder { font-size:12px; color:var(--mute); display:flex; justify-content:space-between; align-items:center; gap:6px; }
+  .folder b { color:var(--ink); font-weight:600; }
+  .folder button { padding:2px 8px; font-size:12px; }
+  details { font-size:12.5px; } details summary { cursor:pointer; color:var(--mute); }
+  .grid2 { display:grid; grid-template-columns:1fr 70px; gap:4px 8px; align-items:center; margin-top:8px; }
+  .grid2 input { padding:4px 6px; }
+  .panel { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:20px 22px; max-width:1200px; }
+  .panel h2 { font-size:16px; margin:0 0 12px; }
+  .help ol { padding-left:20px; margin:8px 0; } .help li { margin:6px 0; }
+  .help .tip { background:#f6f8fa; border-left:3px solid var(--acc); padding:10px 12px; border-radius:0 8px 8px 0; margin-top:14px; font-size:13px; }
+  .review { display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:22px; align-items:start; }
+  canvas#ov { width:100%; height:auto; border:1px solid var(--line); border-radius:8px; background:#fff; }
+  table#rv-table { border-collapse:collapse; width:100%; }
+  #rv-table th { font-size:12px; text-align:center; padding:3px; } #rv-table th.od { color:var(--od); } #rv-table th.og { color:var(--og); }
+  #rv-table td { padding:2px 3px; font-size:12.5px; text-align:right; }
+  #rv-table input { text-align:center; padding:4px; }
+  .axes { border:1px solid var(--line); border-radius:8px; padding:8px 10px; margin-top:12px; font-size:12px; }
+  .axes .grid2 { grid-template-columns:1fr 64px; }
+  .actions { display:flex; gap:8px; margin-top:14px; flex-wrap:wrap; }
+  .actions .ok { background:var(--acc); color:#fff; border-color:var(--acc); font-weight:650; flex:1; }
+  canvas#mn { max-width:100%; height:auto; cursor:crosshair; border:1px solid var(--line); border-radius:8px; }
+  .result img { width:100%; border:1px solid var(--line); border-radius:6px; box-shadow:0 4px 18px rgba(0,0,0,.06); }
+  .sent { margin-top:12px; padding:10px 12px; background:#e6f4f1; border-radius:8px; color:#0a5a52; display:flex; justify-content:space-between; align-items:center; }
+  .legendhint { display:flex; gap:14px; font-size:12px; color:var(--mute); margin-bottom:8px; }
+  .legendhint b.od { color:var(--od); } .legendhint b.og { color:var(--og); }
+  @media (max-width: 900px) { .wrap { grid-template-columns:1fr; } aside { border-right:0; border-bottom:1px solid var(--line); } .review { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+<aside>
+  <h1>Superposeur d'audiogrammes<small>Capture à l'écran · superposition · envoi Doctolib</small></h1>
+
+  <div>
+    <label class="f" for="patient">Patient (titre et nom du fichier)</label>
+    <input id="patient" type="text" placeholder="NOM Prénom" autocomplete="off">
+  </div>
+
+  <div>
+    <div class="step">1 · Source</div>
+    <button id="btn-share" class="btn-wide">🖥  Choisir la fenêtre ou l'écran à lire</button>
+    <div class="src" id="src-on" hidden><video id="video" muted playsinline></video><span id="src-kind"></span></div>
+  </div>
+
+  <div>
+    <div class="step">2 · Capturer chaque audiogramme</div>
+    <button id="btn-capture" class="btn-main" disabled>📷  Capturer l'audiogramme affiché</button>
+    <label class="chk"><input type="checkbox" id="delay"> Retardateur 3 s (si l'écran entier est partagé)</label>
+    <p class="hint">ou collez une capture d'écran (<b>Ctrl+V</b>), glissez une image ici, ou
+      <label style="text-decoration:underline;cursor:pointer">importez un fichier<input type="file" id="file" accept="image/*" hidden></label>.</p>
+  </div>
+
+  <div>
+    <div class="step">Audiogrammes importés <span style="text-transform:none;font-weight:400">(du plus ancien au plus récent)</span></div>
+    <ul id="list"></ul>
+    <div id="empty">Aucun pour l'instant</div>
+  </div>
+
+  <div>
+    <div class="step">3 · Superposer et envoyer</div>
+    <button id="btn-sup" class="btn-main" disabled>Superposer les audiogrammes</button>
+    <div style="height:8px"></div>
+    <button id="btn-send" class="btn-send" disabled>Envoyer vers Doctolib</button>
+    <div class="folder" style="margin-top:6px"><span>Dossier Doctolib : <b id="folder">pas encore choisi</b></span><button id="btn-folder">Choisir…</button></div>
+  </div>
+
+  <div id="status" class="status">Commencez par choisir la fenêtre ou l'écran où s'affichent les audiogrammes.</div>
+
+  <div class="row" style="justify-content:space-between">
+    <button id="btn-new">Nouveau patient</button>
+  </div>
+
+  <details>
+    <summary>Paramètres de lecture</summary>
+    <p class="hint">Graduations des bords de la grille de vos audiogrammes :</p>
+    <div class="grid2">
+      <span>Fréquence bord gauche (Hz)</span><input id="st-f_min" inputmode="decimal">
+      <span>Fréquence bord droit (Hz)</span><input id="st-f_max" inputmode="decimal">
+      <span>dB bord haut</span><input id="st-db_min" inputmode="decimal">
+      <span>dB bord bas</span><input id="st-db_max" inputmode="decimal">
+    </div>
+    <label class="chk"><input type="checkbox" id="st-round"> Arrondir au pas de 5 dB</label>
+    <button id="st-save" style="margin-top:8px">Enregistrer</button>
+  </details>
+</aside>
+
+<main>
+  <section id="p-help" class="panel help">
+    <h2>Mode d'emploi</h2>
+    <ol>
+      <li><b>Choisir la source</b> : dans la fenêtre de Chrome, sélectionnez de préférence la <b>fenêtre</b> du logiciel
+        d'audiométrie, ou l'<b>onglet</b> Chrome (Doctolib, PDF…) où s'affichent les audiogrammes. La capture fonctionne
+        alors même si cette page-ci est au premier plan. À faire une seule fois par séance.</li>
+      <li>Affichez un audiogramme, revenez ici et cliquez sur <b>Capturer</b>. La grille est repérée automatiquement ;
+        les points lus apparaissent entourés, avec un tableau modifiable. Tapez la date de l'examen et validez.</li>
+      <li>Affichez l'audiogramme suivant, capturez, etc. Rangez-les du plus ancien au plus récent (▲ ▼).</li>
+      <li><b>Superposer</b> crée le PDF ; <b>Envoyer vers Doctolib</b> l'écrit dans le dossier d'import (passerelle) de
+        Doctolib, choisi une fois pour toutes.</li>
+    </ol>
+    <div class="legendhint"><span><b class="od">Rouge</b> = oreille droite</span><span><b class="og">Bleu</b> = oreille gauche</span></div>
+    <div class="tip">Rien ne quitte votre ordinateur : la lecture des audiogrammes et la création du PDF se font dans Chrome.
+      Sur Mac, autorisez Chrome dans Réglages Système › Confidentialité et sécurité › <i>Enregistrement de l'écran</i>.</div>
+  </section>
+
+  <section id="p-review" class="panel" hidden>
+    <h2>Vérifier l'audiogramme lu</h2>
+    <div class="review">
+      <div>
+        <div class="legendhint"><span>Cercles = points lus — ils doivent tomber sur les symboles</span></div>
+        <canvas id="ov"></canvas>
+      </div>
+      <div>
+        <label class="f" for="rv-label">Date / libellé de l'examen</label>
+        <input id="rv-label" type="text">
+        <div style="height:10px"></div>
+        <table id="rv-table"></table>
+        <p class="hint">Case vide = fréquence non mesurée.</p>
+        <div class="axes">
+          <b>Graduations des bords de la grille</b>
+          <div class="grid2">
+            <span>Hz bord gauche</span><input id="ax-f_min" inputmode="decimal">
+            <span>Hz bord droit</span><input id="ax-f_max" inputmode="decimal">
+            <span>dB bord haut</span><input id="ax-db_min" inputmode="decimal">
+            <span>dB bord bas</span><input id="ax-db_max" inputmode="decimal">
+          </div>
+          <button id="rv-reread" style="margin-top:8px;width:100%">Relire avec ces graduations</button>
+        </div>
+        <div class="actions">
+          <button id="rv-ok" class="ok">✔ Valider</button>
+          <button id="rv-manual">Encadrer à la main</button>
+          <button id="rv-cancel">Annuler</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="p-manual" class="panel" hidden>
+    <h2>Encadrer la grille à la main</h2>
+    <p id="mn-msg" class="hint" style="font-size:13px"></p>
+    <canvas id="mn"></canvas>
+    <div class="actions"><button id="mn-cancel">Annuler</button></div>
+  </section>
+
+  <section id="p-result" class="panel result" hidden>
+    <h2>PDF superposé</h2>
+    <p class="hint" style="margin-top:-6px">Fichier : <b id="res-name"></b></p>
+    <img id="res-img" alt="Aperçu du PDF">
+    <div class="actions">
+      <button id="btn-open">Ouvrir le PDF</button>
+      <button id="btn-dl" disabled>Télécharger</button>
+    </div>
+    <div class="sent" id="res-sent" hidden><span>✔ Déposé dans le dossier d'import Doctolib.</span><button id="btn-new2">Patient suivant</button></div>
+  </section>
+</main>
+</div>
+<script>
+/* Moteur : repérage de la grille d'audiogramme et lecture des seuils. */
+const AG = (() => {
+  const STD = [125, 250, 500, 750, 1000, 1500, 2000, 3000, 4000, 6000, 8000];
+  const OCT = new Set([125, 250, 500, 1000, 2000, 4000, 8000]);
+  const EARS = ["right", "left"];
+  const DEFAULTS = { f_min: 125, f_max: 8000, db_min: -10, db_max: 120, round_5: true };
+
+  // ---------------------------------------------------------------- pixels
+  function prep(imgData) {
+    const { width: W, height: H, data } = imgData;
+    const n = W * H;
+    const gray = new Uint8Array(n), red = new Uint8Array(n), blue = new Uint8Array(n);
+    for (let i = 0, p = 0; i < n; i++, p += 4) {
+      const r = data[p], g = data[p + 1], b = data[p + 2];
+      gray[i] = (0.299 * r + 0.587 * g + 0.114 * b + 0.5) | 0;
+      const mx = r > g ? (r > b ? r : b) : (g > b ? g : b);
+      const mn = r < g ? (r < b ? r : b) : (g < b ? g : b);
+      const d = mx - mn;
+      if (d === 0 || mx < 45) continue;
+      const s = (255 * d) / mx;
+      if (s < 80) continue;
+      let h;
+      if (mx === r) h = 60 * ((g - b) / d);
+      else if (mx === g) h = 60 * ((b - r) / d + 2);
+      else h = 60 * ((r - g) / d + 4);
+      if (h < 0) h += 360;
+      h /= 2;
+      if ((h <= 10 || h >= 168) && s >= 90 && mx >= 70) red[i] = 1;
+      else if (h >= 95 && h <= 135) blue[i] = 1;
+    }
+    return { W, H, gray, red, blue };
+  }
+
+  function crop(P, x0, y0, x1, y1) {
+    const W = x1 - x0, H = y1 - y0;
+    const out = { W, H, gray: new Uint8Array(W * H), red: new Uint8Array(W * H), blue: new Uint8Array(W * H) };
+    for (let y = 0; y < H; y++) {
+      const a = (y + y0) * P.W + x0;
+      for (const k of ["gray", "red", "blue"]) out[k].set(P[k].subarray(a, a + W), y * W);
+    }
+    return out;
+  }
+
+  function adaptiveInv(gray, W, H, bs = 21, C = 6) {
+    const I = new Float64Array((W + 1) * (H + 1));
+    for (let y = 0; y < H; y++) {
+      let row = 0;
+      for (let x = 0; x < W; x++) {
+        row += gray[y * W + x];
+        I[(y + 1) * (W + 1) + x + 1] = I[y * (W + 1) + x + 1] + row;
+      }
+    }
+    const r = bs >> 1, out = new Uint8Array(W * H);
+    for (let y = 0; y < H; y++) {
+      const ya = Math.max(0, y - r), yb = Math.min(H, y + r + 1);
+      for (let x = 0; x < W; x++) {
+        const xa = Math.max(0, x - r), xb = Math.min(W, x + r + 1);
+        const sum = I[yb * (W + 1) + xb] - I[ya * (W + 1) + xb] - I[yb * (W + 1) + xa] + I[ya * (W + 1) + xa];
+        const mean = sum / ((yb - ya) * (xb - xa));
+        out[y * W + x] = gray[y * W + x] <= mean - C ? 1 : 0;
+      }
+    }
+    return out;
+  }
+
+  // dilatation / érosion par un rectangle kx × ky (séparable)
+  function box1D(src, W, H, k, horizontal, erode) {
+    const out = new Uint8Array(W * H), r = k >> 1;
+    const len = horizontal ? W : H, lines = horizontal ? H : W;
+    const pre = new Int32Array(len + 1);
+    for (let l = 0; l < lines; l++) {
+      for (let i = 0; i < len; i++) {
+        const idx = horizontal ? l * W + i : i * W + l;
+        pre[i + 1] = pre[i] + src[idx];
+      }
+      for (let i = 0; i < len; i++) {
+        const a = Math.max(0, i - r), b = Math.min(len, i + r + 1);
+        const c = pre[b] - pre[a];
+        const idx = horizontal ? l * W + i : i * W + l;
+        out[idx] = erode ? (c === b - a ? 1 : 0) : (c > 0 ? 1 : 0);
+      }
+    }
+    return out;
+  }
+  const dilate = (m, W, H, k) => box1D(box1D(m, W, H, k, true, false), W, H, k, false, false);
+  const erode = (m, W, H, k) => box1D(box1D(m, W, H, k, true, true), W, H, k, false, true);
+
+  // ouverture par un segment (garde les traits ≥ klen) puis fermeture des trous < gap
+  function lineMask(bw, W, H, klen, gap, horizontal) {
+    const out = new Uint8Array(W * H);
+    const len = horizontal ? W : H, lines = horizontal ? H : W;
+    const at = (l, i) => (horizontal ? l * W + i : i * W + l);
+    for (let l = 0; l < lines; l++) {
+      let lastEnd = -1;
+      let i = 0;
+      while (i < len) {
+        if (!bw[at(l, i)]) { i++; continue; }
+        let j = i;
+        while (j < len && bw[at(l, j)]) j++;
+        if (j - i >= klen) {
+          for (let t = i; t < j; t++) out[at(l, t)] = 1;
+          if (lastEnd >= 0 && i - lastEnd < gap) for (let t = lastEnd; t < i; t++) out[at(l, t)] = 1;
+          lastEnd = j;
+        }
+        i = j;
+      }
+    }
+    return out;
+  }
+
+  function lineMasks(P) {
+    const { W, H } = P;
+    const bw = adaptiveInv(P.gray, W, H);
+    const col = new Uint8Array(W * H);
+    for (let i = 0; i < W * H; i++) col[i] = P.red[i] | P.blue[i];
+    const k = Math.max(9, Math.floor(Math.min(H, W) / 40));
+    const closed = erode(dilate(col, W, H, k), W, H, k);
+    for (let i = 0; i < W * H; i++) bw[i] |= closed[i];
+    const klen = Math.max(25, Math.floor(Math.min(H, W) / 35));
+    const gap = Math.max(15, Math.floor(Math.min(H, W) / 45));
+    return { horiz: lineMask(bw, W, H, klen, gap, true), vert: lineMask(bw, W, H, klen, gap, false) };
+  }
+
+  function runs(profile, thr) {
+    const out = [];
+    let start = -1;
+    for (let i = 0; i < profile.length; i++) {
+      if (profile[i] > thr) { if (start < 0) start = i; }
+      else if (start >= 0) { out.push((start + i - 1) >> 1); start = -1; }
+    }
+    if (start >= 0) out.push((start + profile.length - 1) >> 1);
+    return out;
+  }
+
+  function regular(pos) {
+    if (pos.length < 3) return 0;
+    const d = [];
+    for (let i = 1; i < pos.length; i++) d.push(pos[i] - pos[i - 1]);
+    const m = d.reduce((a, b) => a + b, 0) / d.length;
+    const sd = Math.sqrt(d.reduce((a, b) => a + (b - m) ** 2, 0) / d.length);
+    return Math.max(0, 1 - sd / Math.max(m, 1e-6));
+  }
+
+  function colorStats(P, g) {
+    let r = 0, b = 0;
+    for (let y = g.y0; y <= g.y1; y++)
+      for (let x = g.x0; x <= g.x1; x++) { const i = y * P.W + x; r += P.red[i]; b += P.blue[i]; }
+    const area = Math.max(1, (g.y1 - g.y0 + 1) * (g.x1 - g.x0 + 1));
+    g.red = r / area; g.blue = b / area;
+  }
+
+  function findGrids(P, minLines = 5) {
+    const { W, H } = P;
+    const { horiz, vert } = lineMasks(P);
+    const both = new Uint8Array(W * H);
+    for (let i = 0; i < W * H; i++) both[i] = horiz[i] | vert[i];
+    const lines = dilate(both, W, H, 3);
+    // composantes connexes (8-connexité)
+    const lab = new Int32Array(W * H);
+    const stack = new Int32Array(W * H);
+    const comps = [];
+    let n = 0;
+    for (let s0 = 0; s0 < W * H; s0++) {
+      if (!lines[s0] || lab[s0]) continue;
+      n++;
+      let sp = 0, x0 = W, y0 = H, x1 = 0, y1 = 0;
+      stack[sp++] = s0; lab[s0] = n;
+      while (sp) {
+        const p = stack[--sp], x = p % W, y = (p - x) / W;
+        if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+        for (let dy = -1; dy <= 1; dy++) {
+          const yy = y + dy; if (yy < 0 || yy >= H) continue;
+          for (let dx = -1; dx <= 1; dx++) {
+            const xx = x + dx; if (xx < 0 || xx >= W) continue;
+            const q = yy * W + xx;
+            if (lines[q] && !lab[q]) { lab[q] = n; stack[sp++] = q; }
+          }
+        }
+      }
+      comps.push({ id: n, x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 });
+    }
+    const cands = [];
+    for (const c of comps) {
+      if (c.w < 120 || c.h < 100) continue;
+      if (!(c.w / c.h > 0.3 && c.w / c.h < 4)) continue;
+      const colS = new Float64Array(c.w), rowS = new Float64Array(c.h);
+      for (let y = 0; y < c.h; y++)
+        for (let x = 0; x < c.w; x++) {
+          const i = (y + c.y) * W + x + c.x;
+          if (lab[i] !== c.id) continue;
+          colS[x] += vert[i]; rowS[y] += horiz[i];
+        }
+      const vl = runs(colS, 0.6 * c.h), hl = runs(rowS, 0.6 * c.w);
+      if (vl.length < minLines || hl.length < minLines) continue;
+      const g = { x0: c.x + vl[0], y0: c.y + hl[0], x1: c.x + vl[vl.length - 1], y1: c.y + hl[hl.length - 1],
+        vl: vl.map(v => v + c.x), hl: hl.map(v => v + c.y) };
+      colorStats(P, g);
+      const colour = g.red + g.blue;
+      if (colour < 0.0015) continue;
+      const reg = 0.5 * (regular(hl) + regular(vl));
+      g.score = vl.length * hl.length * (0.3 + reg) * (1 + 50 * Math.min(colour, 0.05)) * Math.sqrt(c.w * c.h);
+      cands.push(g);
+    }
+    cands.sort((a, b) => b.score - a.score);
+    return cands;
+  }
+
+  function pickGrids(cands) {
+    if (!cands.length) return null;
+    const best = cands[0];
+    if (best.red > 0.0008 && best.blue > 0.0008) return { right: best, left: best };
+    const want = best.red > best.blue ? "blue" : "red";
+    const w = x => x.x1 - x.x0, h = x => x.y1 - x.y0;
+    for (const g of cands.slice(1)) {
+      if (Math.abs(w(g) - w(best)) < 0.25 * w(best) && Math.abs(h(g) - h(best)) < 0.25 * h(best) && g[want] > 0.0008)
+        return want === "blue" ? { right: best, left: g } : { right: g, left: best };
+    }
+    return best.red > best.blue ? { right: best } : { left: best };
+  }
+
+  function gridFromRect(P, rect) {
+    let [x0, y0, x1, y1] = rect.map(v => Math.round(v));
+    [x0, x1] = [Math.min(x0, x1), Math.max(x0, x1)];
+    [y0, y1] = [Math.min(y0, y1), Math.max(y0, y1)];
+    const rect0 = [x0, y0, x1, y1];
+    const mx = Math.floor(0.05 * (x1 - x0)), my = Math.floor(0.05 * (y1 - y0));
+    x0 = Math.max(0, x0 - mx); y0 = Math.max(0, y0 - my);
+    x1 = Math.min(P.W, x1 + mx); y1 = Math.min(P.H, y1 + my);
+    const sub = crop(P, x0, y0, x1, y1);
+    const { horiz, vert } = lineMasks(sub);
+    const colS = new Float64Array(sub.W), rowS = new Float64Array(sub.H);
+    for (let y = 0; y < sub.H; y++)
+      for (let x = 0; x < sub.W; x++) { const i = y * sub.W + x; colS[x] += vert[i]; rowS[y] += horiz[i]; }
+    const vl = runs(colS, 0.5 * sub.H).map(v => v + x0), hl = runs(rowS, 0.5 * sub.W).map(v => v + y0);
+    const g = { x0: rect0[0], y0: rect0[1], x1: Math.min(rect0[2], P.W - 1), y1: Math.min(rect0[3], P.H - 1), vl, hl };
+    if (vl.length >= 2 && hl.length >= 2) {
+      g.x0 = vl[0]; g.x1 = vl[vl.length - 1]; g.y0 = hl[0]; g.y1 = hl[hl.length - 1];
+    }
+    colorStats(P, g);
+    return g;
+  }
+
+  // ------------------------------------------------------- pixels ↔ valeurs
+  const xOfF = (g, f, s) => g.x0 + (Math.log(f / s.f_min) / Math.log(s.f_max / s.f_min)) * (g.x1 - g.x0);
+  const dbOfY = (g, y, s) => s.db_min + ((y - g.y0) / Math.max(1, g.y1 - g.y0)) * (s.db_max - s.db_min);
+  const yOfDb = (g, db, s) => g.y0 + ((db - s.db_min) / (s.db_max - s.db_min)) * (g.y1 - g.y0);
+  const freqsInRange = s => STD.filter(f => f >= s.f_min * 0.99 && f <= s.f_max * 1.01);
+
+  function curveY(mask, W, reg, x, b, gap, yHint) {
+    const xa = Math.max(reg.ox, Math.round(x - b)), xb = Math.min(reg.ex, Math.round(x + b) + 1);
+    if (xb <= xa) return [null, 0];
+    const groups = [];
+    let start = -1, prev = -1, cnt = 0;
+    for (let y = reg.oy; y < reg.ey; y++) {
+      let c = 0;
+      for (let xx = xa; xx < xb; xx++) c += mask[y * W + xx];
+      if (!c) continue;
+      if (start < 0) { start = y; cnt = 0; }
+      else if (y - prev > gap) { groups.push([start, prev, cnt]); start = y; cnt = 0; }
+      cnt += c; prev = y;
+    }
+    if (start < 0) return [null, 0];
+    groups.push([start, prev, cnt]);
+    let best;
+    if (yHint == null) best = groups.reduce((a, g) => (g[2] > a[2] ? g : a));
+    else best = groups.reduce((a, g) => (Math.abs((g[0] + g[1]) / 2 - yHint) < Math.abs((a[0] + a[1]) / 2 - yHint) ? g : a));
+    return [(best[0] + best[1]) / 2, best[1] - best[0] + 1];
+  }
+
+  function density(mask, W, reg, x, y, rx, ry) {
+    const xa = Math.max(reg.ox, Math.trunc(x - rx)), xb = Math.min(reg.ex, Math.trunc(x + rx) + 1);
+    const ya = Math.max(reg.oy, Math.trunc(y - ry)), yb = Math.min(reg.ey, Math.trunc(y + ry) + 1);
+    if (xb <= xa || yb <= ya) return 0;
+    let c = 0;
+    for (let yy = ya; yy < yb; yy++) for (let xx = xa; xx < xb; xx++) c += mask[yy * W + xx];
+    return c / (xb - xa);
+  }
+
+  function extractEar(P, g, ear, s) {
+    const gw = g.x1 - g.x0, gh = g.y1 - g.y0;
+    const pad = Math.floor(0.04 * Math.max(gw, gh)) + 4;
+    const reg = { ox: Math.max(0, g.x0 - pad), oy: Math.max(0, g.y0 - pad),
+      ex: Math.min(P.W, g.x1 + pad + 1), ey: Math.min(P.H, g.y1 + pad + 1) };
+    const mask = ear === "right" ? P.red : P.blue, W = P.W;
+    const freqs = freqsInRange(s);
+    const octPx = gw / Math.log2(s.f_max / s.f_min);
+    const b = Math.max(2, 0.006 * gw), gap = Math.max(4, Math.floor(0.045 * gh));
+    const xs = {}; for (const f of freqs) xs[f] = xOfF(g, f, s);
+    const allX = STD.map(f => xOfF(g, f, s));
+    const found = {}, exts = [];
+    for (const f of freqs) {
+      if (!OCT.has(f)) continue;
+      const [y, ext] = curveY(mask, W, reg, xs[f], b, gap, null);
+      if (y != null) { found[f] = y; exts.push(ext); }
+    }
+    let r;
+    if (exts.length) { const e = [...exts].sort((a, c) => a - c); const m = e.length;
+      r = (m % 2 ? e[(m - 1) / 2] : (e[m / 2 - 1] + e[m / 2]) / 2) / 2 + 1; }
+    else r = Math.max(4, 0.022 * gh);
+    r = Math.min(Math.max(r, 3), 0.06 * gh);
+    for (const f of freqs) {
+      if (OCT.has(f)) continue;
+      const x = xs[f];
+      const [y] = curveY(mask, W, reg, x, b, gap, null);
+      if (y == null) continue;
+      const dens = density(mask, W, reg, x, y, r, r);
+      const refs = [];
+      for (const side of [-1, 1]) {
+        const neigh = allX.filter(xx => (xx - x) * side > 1);
+        const d = neigh.length ? Math.abs(neigh.reduce((a, xx) => (Math.abs(xx - x) < Math.abs(a - x) ? xx : a)) - x) / 2 : 0.25 * octPx;
+        const xr = x + side * d, rw = Math.max(1, Math.min(r, d - r - 2));
+        const [yr] = curveY(mask, W, reg, xr, 1, gap, y);
+        refs.push(yr == null || Math.abs(yr - y) > 0.5 * gh ? 0 : density(mask, W, reg, xr, yr, rw, r));
+      }
+      const ref = (refs[0] + refs[1]) / 2;
+      if (dens > Math.max(1.6 * ref, 1)) found[f] = y;
+    }
+    const values = {}, pix = {};
+    for (const f of Object.keys(found).map(Number).sort((a, c) => a - c)) {
+      let db = dbOfY(g, found[f], s);
+      db = s.round_5 ? 5 * Math.round(db / 5) : Math.round(db * 10) / 10;
+      if (Object.is(db, -0)) db = 0;
+      values[f] = db; pix[f] = [xs[f], found[f]];
+    }
+    return { values, pix };
+  }
+
+  function extract(P, grids, s) {
+    const out = { right: {}, left: {} };
+    for (const ear of EARS) if (grids[ear]) out[ear] = extractEar(P, grids[ear], ear, s).values;
+    return out;
+  }
+
+  function analyse(P, s) {
+    const grids = pickGrids(findGrids(P));
+    if (!grids) return { grids: null, data: null };
+    return { grids, data: extract(P, grids, s) };
+  }
+
+  function pta(v) {
+    const fs = [500, 1000, 2000, 4000];
+    return fs.every(f => v[f] != null) ? fs.reduce((a, f) => a + v[f], 0) / 4 : null;
+  }
+
+  return { STD, OCT, EARS, DEFAULTS, prep, findGrids, pickGrids, gridFromRect, extract, analyse,
+    xOfF, yOfDb, freqsInRange, pta };
+})();
+if (typeof module !== "undefined") module.exports = AG;
+
+</script>
+<script>
+/* Interface : capture d'écran (Chrome), vérification, PDF superposé, envoi Doctolib. */
+(() => {
+  const $ = id => document.getElementById(id);
+  const EAR_NAME = { right: "Oreille droite", left: "Oreille gauche" };
+  const EAR_COL = { right: "#c62828", left: "#1565c0" };
+
+  // ------------------------------------------------------------ réglages
+  const S = { ...AG.DEFAULTS };
+  try { Object.assign(S, JSON.parse(localStorage.getItem("ag_settings") || "{}")); } catch (e) {}
+  const saveS = () => { try { localStorage.setItem("ag_settings", JSON.stringify(S)); } catch (e) {} };
+
+  // petit stockage IndexedDB pour le dossier Doctolib
+  function idb(mode, fn) {
+    return new Promise((res, rej) => {
+      const rq = indexedDB.open("superposeur_audiogrammes", 1);
+      rq.onupgradeneeded = () => rq.result.createObjectStore("kv");
+      rq.onerror = () => rej(rq.error);
+      rq.onsuccess = () => {
+        const tx = rq.result.transaction("kv", mode), st = tx.objectStore("kv");
+        const r = fn(st);
+        tx.oncomplete = () => res(r && r.result);
+        tx.onerror = () => rej(tx.error);
+      };
+    });
+  }
+  const idbGet = k => idb("readonly", st => st.get(k)).catch(() => null);
+  const idbSet = (k, v) => idb("readwrite", st => st.put(v, k)).catch(() => null);
+
+  // ------------------------------------------------------------ état
+  let stream = null, controller = null;
+  const video = $("video");
+  let items = [];       // {label, right, left, canvas, grids}
+  let current = null;   // audiogramme en cours de vérification
+  let pdf = null;       // {blob, name, url}
+  let dirHandle = null;
+
+  const status = (t, kind) => { const el = $("status"); el.textContent = t; el.className = "status " + (kind || ""); };
+  const show = id => { for (const p of ["p-help", "p-review", "p-manual", "p-result"]) $(p).hidden = p !== id; };
+
+  // ------------------------------------------------------------ partage d'écran
+  async function shareScreen() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+      status("Ce navigateur ne permet pas la capture d'écran. Utilisez Chrome, ou collez une capture (Ctrl+V).", "err");
+      return;
+    }
+    try {
+      controller = "CaptureController" in window ? new CaptureController() : null;
+      const opts = { video: { width: { ideal: 3840 }, height: { ideal: 2160 }, frameRate: { ideal: 5 } },
+        audio: false, selfBrowserSurface: "exclude", surfaceSwitching: "include" };
+      if (controller) opts.controller = controller;
+      stream = await navigator.mediaDevices.getDisplayMedia(opts);
+      if (controller && controller.setFocusBehavior) {
+        try { controller.setFocusBehavior("no-focus-change"); } catch (e) {}
+      }
+    } catch (e) {
+      stream = null;
+      status("Partage annulé.", "");
+      return updateSource();
+    }
+    video.srcObject = stream;
+    await video.play().catch(() => {});
+    const tr = stream.getVideoTracks()[0];
+    tr.addEventListener("ended", () => { stream = null; video.srcObject = null; updateSource(); });
+    const surf = (tr.getSettings && tr.getSettings().displaySurface) || "";
+    $("delay").checked = surf === "monitor";
+    updateSource(surf);
+    status(surf === "monitor"
+      ? "Écran entier partagé : le retardateur de 3 s est activé pour vous laisser le temps d'afficher l'audiogramme."
+      : "Source partagée. Affichez un audiogramme puis cliquez sur Capturer.", "ok");
+  }
+
+  function updateSource(surf) {
+    const on = !!stream;
+    $("src-on").hidden = !on;
+    $("btn-share").textContent = on ? "Changer de source…" : "🖥  Choisir la fenêtre ou l'écran à lire";
+    $("btn-capture").disabled = !on;
+    const names = { monitor: "écran entier", window: "fenêtre", browser: "onglet Chrome" };
+    $("src-kind").textContent = on ? "Partagé : " + (names[surf] || "source choisie") : "";
+  }
+
+  async function grabFrame() {
+    if (!stream) throw new Error("Aucune source partagée");
+    if (video.readyState < 2) await new Promise(r => video.addEventListener("loadeddata", r, { once: true }));
+    await new Promise(r => setTimeout(r, 120));   // laisse arriver une image fraîche
+    const cv = document.createElement("canvas");
+    cv.width = video.videoWidth; cv.height = video.videoHeight;
+    cv.getContext("2d").drawImage(video, 0, 0);
+    return cv;
+  }
+
+  async function capture() {
+    $("btn-capture").disabled = true;
+    try {
+      if ($("delay").checked) {
+        for (let i = 3; i > 0; i--) { status(`Capture dans ${i} s… affichez l'audiogramme`, "busy"); await new Promise(r => setTimeout(r, 1000)); }
+      }
+      const cv = await grabFrame();
+      processCanvas(cv, `Examen ${items.length + 1}`, -1);
+    } catch (e) {
+      status("Capture impossible : " + e.message, "err");
+    } finally { $("btn-capture").disabled = !stream; }
+  }
+
+  function canvasFromImage(img) {
+    const cv = document.createElement("canvas");
+    cv.width = img.width; cv.height = img.height;
+    cv.getContext("2d").drawImage(img, 0, 0);
+    return cv;
+  }
+
+  async function importBlob(blob) {
+    try {
+      const bmp = await createImageBitmap(blob);
+      processCanvas(canvasFromImage(bmp), `Examen ${items.length + 1}`, -1);
+    } catch (e) { status("Image illisible.", "err"); }
+  }
+
+  function prepCanvas(cv) {
+    return AG.prep(cv.getContext("2d", { willReadFrequently: true }).getImageData(0, 0, cv.width, cv.height));
+  }
+
+  function processCanvas(cv, label, editIndex) {
+    status("Recherche de l'audiogramme…", "busy");
+    setTimeout(() => {
+      const P = prepCanvas(cv);
+      const { grids, data } = AG.analyse(P, S);
+      current = { canvas: cv, P, grids, data, label, editIndex };
+      if (!grids || (!Object.keys(data.right).length && !Object.keys(data.left).length)) {
+        openManual("Je n'ai pas trouvé d'audiogramme lisible. Encadrez la grille à la souris.");
+        return;
+      }
+      showReview();
+      status("Vérifiez les points lus, tapez la date de l'examen, puis Valider.", "ok");
+    }, 30);
+  }
+
+  // ------------------------------------------------------------ vérification
+  function drawOverlay() {
+    const { canvas: src, grids, data } = current;
+    const gs = [...new Set(Object.values(grids))];
+    const pad = 40;
+    const ax0 = Math.max(0, Math.min(...gs.map(g => g.x0)) - pad), ay0 = Math.max(0, Math.min(...gs.map(g => g.y0)) - pad);
+    const ax1 = Math.min(src.width, Math.max(...gs.map(g => g.x1)) + pad), ay1 = Math.min(src.height, Math.max(...gs.map(g => g.y1)) + pad);
+    const cv = $("ov"), w = ax1 - ax0, h = ay1 - ay0;
+    const k = Math.min(2, 900 / w);
+    cv.width = Math.round(w * k); cv.height = Math.round(h * k);
+    const c = cv.getContext("2d");
+    c.imageSmoothingQuality = "high";
+    c.drawImage(src, ax0, ay0, w, h, 0, 0, cv.width, cv.height);
+    c.fillStyle = "rgba(255,255,255,.45)"; c.fillRect(0, 0, cv.width, cv.height);
+    const X = x => (x - ax0) * k, Y = y => (y - ay0) * k;
+    for (const g of gs) {
+      c.strokeStyle = "#00a651"; c.lineWidth = 2;
+      c.strokeRect(X(g.x0), Y(g.y0), (g.x1 - g.x0) * k, (g.y1 - g.y0) * k);
+      c.lineWidth = 1; c.strokeStyle = "rgba(0,166,81,.6)";
+      for (const f of AG.freqsInRange(S)) {
+        const x = X(AG.xOfF(g, f, S)); c.beginPath(); c.moveTo(x, Y(g.y0)); c.lineTo(x, Y(g.y1)); c.stroke();
+      }
+    }
+    c.font = "bold 13px system-ui, sans-serif";
+    for (const ear of AG.EARS) {
+      const g = grids[ear]; if (!g) continue;
+      for (const [f, db] of Object.entries(data[ear])) {
+        const x = X(AG.xOfF(g, +f, S)), y = Y(AG.yOfDb(g, db, S));
+        c.strokeStyle = c.fillStyle = EAR_COL[ear]; c.lineWidth = 2.5;
+        c.beginPath(); c.arc(x, y, 10, 0, 2 * Math.PI); c.stroke();
+        c.fillText(String(db), x + 9, ear === "right" ? y - 10 : y + 22);
+      }
+    }
+  }
+
+  function showReview() {
+    show("p-review");
+    $("rv-label").value = current.label;
+    for (const k of ["f_min", "f_max", "db_min", "db_max"]) $("ax-" + k).value = S[k];
+    drawOverlay();
+    const tb = $("rv-table");
+    tb.innerHTML = "<tr><th>Fréquence</th><th class='od'>OD (dB)</th><th class='og'>OG (dB)</th></tr>";
+    for (const f of AG.freqsInRange(S)) {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td>${f} Hz</td>` + AG.EARS.map(e => {
+        const v = current.data[e][f];
+        return `<td><input data-f="${f}" data-e="${e}" inputmode="decimal" value="${v == null ? "" : v}"></td>`;
+      }).join("");
+      tb.appendChild(tr);
+    }
+    setTimeout(() => { $("rv-label").focus(); $("rv-label").select(); }, 50);
+  }
+
+  function reread() {
+    const n = {};
+    for (const k of ["f_min", "f_max", "db_min", "db_max"]) n[k] = parseFloat($("ax-" + k).value.replace(",", "."));
+    if (Object.values(n).some(isNaN) || n.f_min <= 0 || n.f_max <= n.f_min || n.db_max <= n.db_min) {
+      status("Graduations incohérentes.", "err"); return;
+    }
+    Object.assign(S, n); saveS(); syncSettingsForm();
+    current.data = AG.extract(current.P, current.grids, S);
+    current.label = $("rv-label").value;
+    showReview();
+    status("Relu avec les nouvelles graduations (mémorisées).", "ok");
+  }
+
+  function validate() {
+    const out = { right: {}, left: {} };
+    for (const inp of $("rv-table").querySelectorAll("input")) {
+      const t = inp.value.trim().replace(",", ".");
+      if (!t) continue;
+      const v = parseFloat(t);
+      if (isNaN(v)) { inp.focus(); status("Une valeur n'est pas un nombre.", "err"); return; }
+      out[inp.dataset.e][+inp.dataset.f] = v;
+    }
+    if (!Object.keys(out.right).length && !Object.keys(out.left).length) { status("Aucune valeur à importer.", "err"); return; }
+    const it = { label: $("rv-label").value.trim() || "Examen", ...out, canvas: current.canvas, grids: current.grids };
+    if (current.editIndex >= 0) items[current.editIndex] = it; else items.push(it);
+    current = null;
+    invalidate(); renderList(); show("p-help");
+    status(`${items.length} audiogramme(s) importé(s). Affichez le suivant et capturez-le, ou cliquez sur Superposer.`, "ok");
+  }
+
+  // ------------------------------------------------------------ zone manuelle
+  let drag = null;
+  function openManual(msg) {
+    show("p-manual");
+    $("mn-msg").textContent = msg || "Encadrez la grille de l'audiogramme (au ras du quadrillage).";
+    const src = current.canvas, cv = $("mn");
+    const k = Math.min(1, 1400 / src.width);
+    cv.width = Math.round(src.width * k); cv.height = Math.round(src.height * k);
+    cv._k = k;
+    redrawManual();
+    status("Tracez un rectangle autour de la grille.", "busy");
+  }
+  function redrawManual() {
+    const cv = $("mn"), c = cv.getContext("2d");
+    c.drawImage(current.canvas, 0, 0, cv.width, cv.height);
+    if (drag && drag.x1 != null) {
+      c.strokeStyle = "#00c853"; c.lineWidth = 2; c.setLineDash([6, 4]);
+      c.strokeRect(drag.x0, drag.y0, drag.x1 - drag.x0, drag.y1 - drag.y0); c.setLineDash([]);
+    }
+  }
+  function mpos(e) {
+    const cv = $("mn"), r = cv.getBoundingClientRect();
+    return [(e.clientX - r.left) * cv.width / r.width, (e.clientY - r.top) * cv.height / r.height];
+  }
+  function manualDone() {
+    const cv = $("mn"), k = cv._k;
+    if (!drag || Math.abs(drag.x1 - drag.x0) < 15 || Math.abs(drag.y1 - drag.y0) < 15) return;
+    const rect = [drag.x0, drag.y0, drag.x1, drag.y1].map(v => v / k);
+    drag = null;
+    const g = AG.gridFromRect(current.P, rect);
+    let grids;
+    if (g.red > 0.0005 && g.blue < 0.0005) grids = { right: g };
+    else if (g.blue > 0.0005 && g.red < 0.0005) grids = { left: g };
+    else grids = { right: g, left: g };
+    current.grids = grids;
+    current.data = AG.extract(current.P, grids, S);
+    showReview();
+    status("Vérifiez les points lus, puis Valider.", "ok");
+  }
+
+  // ------------------------------------------------------------ liste
+  function renderList() {
+    const ul = $("list");
+    ul.innerHTML = "";
+    items.forEach((it, i) => {
+      const li = document.createElement("li");
+      li.innerHTML = `<span class="n">${i + 1}</span><span class="lb"></span>
+        <span class="acts"><button title="Monter" data-a="up">▲</button><button title="Descendre" data-a="down">▼</button>
+        <button title="Modifier" data-a="edit">✎</button><button title="Supprimer" data-a="del">✕</button></span>`;
+      li.querySelector(".lb").textContent = it.label;
+      li.title = `OD : ${Object.keys(it.right).length} points · OG : ${Object.keys(it.left).length} points`;
+      li.querySelectorAll("button").forEach(b => b.onclick = () => listAction(b.dataset.a, i));
+      ul.appendChild(li);
+    });
+    $("empty").hidden = items.length > 0;
+    $("btn-sup").disabled = !items.length;
+  }
+  function listAction(a, i) {
+    if (a === "up" && i > 0) [items[i - 1], items[i]] = [items[i], items[i - 1]];
+    else if (a === "down" && i < items.length - 1) [items[i + 1], items[i]] = [items[i], items[i + 1]];
+    else if (a === "del") items.splice(i, 1);
+    else if (a === "edit") {
+      const it = items[i];
+      current = { canvas: it.canvas, P: prepCanvas(it.canvas), grids: it.grids,
+        data: { right: { ...it.right }, left: { ...it.left } }, label: it.label, editIndex: i };
+      showReview(); return;
+    } else return;
+    invalidate(); renderList();
+  }
+  function invalidate() {
+    if (pdf && pdf.url) URL.revokeObjectURL(pdf.url);
+    pdf = null;
+    $("btn-send").disabled = $("btn-dl").disabled = true;
+  }
+
+  // ------------------------------------------------------------ page PDF
+  function shade(ear, t) {
+    const a = ear === "right" ? [252, 146, 114] : [158, 202, 225];
+    const b = ear === "right" ? [103, 0, 13] : [8, 48, 107];
+    return `rgb(${a.map((v, i) => Math.round(v + (b[i] - v) * t)).join(",")})`;
+  }
+  const flabel = f => (f >= 1000 ? `${f / 1000}k` : `${f}`);
+  const fmt = v => (Math.round(v * 10) / 10).toString().replace(".", ",");
+
+  function drawChart(c, k, x, y, w, h, ear, list, rng) {
+    const { fmin, fmax, dbmin, dbmax } = rng;
+    const L = Math.log(fmin / 1.25), R = Math.log(fmax * 1.25);
+    const PX = f => x + ((Math.log(f) - L) / (R - L)) * w;
+    const top = dbmin - 5, bot = dbmax + 5;
+    const PY = db => y + ((db - top) / (bot - top)) * h;
+    c.fillStyle = "#fff"; c.fillRect(x, y, w, h);
+    c.fillStyle = "#e8f5e9"; c.fillRect(x, y, w, PY(20) - y);
+    c.strokeStyle = "#cfcfcf"; c.lineWidth = 0.6 * k;
+    c.font = `${7.5 * k}px Helvetica, Arial, sans-serif`; c.fillStyle = "#333";
+    c.textAlign = "center"; c.textBaseline = "top";
+    for (const f of AG.STD) {
+      if (f < fmin || f > fmax) continue;
+      c.beginPath(); c.moveTo(PX(f), y); c.lineTo(PX(f), y + h); c.stroke();
+      c.fillText(flabel(f), PX(f), y + h + 4 * k);
+    }
+    c.textAlign = "right"; c.textBaseline = "middle";
+    for (let d = Math.floor(dbmin / 10) * 10; d <= dbmax; d += 10) {
+      c.beginPath(); c.moveTo(x, PY(d)); c.lineTo(x + w, PY(d)); c.stroke();
+      c.fillText(String(d), x - 4 * k, PY(d));
+    }
+    c.strokeStyle = "#555"; c.lineWidth = 0.8 * k; c.strokeRect(x, y, w, h);
+    c.textAlign = "center"; c.textBaseline = "alphabetic";
+    c.font = `bold ${12 * k}px Helvetica, Arial, sans-serif`; c.fillStyle = EAR_COL[ear];
+    c.fillText(EAR_NAME[ear], x + w / 2, y - 7 * k);
+    c.font = `${8 * k}px Helvetica, Arial, sans-serif`; c.fillStyle = "#333";
+    c.fillText("Fréquence (Hz)", x + w / 2, y + h + 20 * k);
+
+    const dashes = [[], [7, 4], [9, 3, 2, 3], [2, 3]];
+    const n = list.length, ms = 3.6 * k;
+    const legend = [];
+    list.forEach((a, i) => {
+      const v = a[ear], fs = Object.keys(v).map(Number).sort((p, q) => p - q);
+      if (!fs.length) return;
+      const col = shade(ear, n > 1 ? i / (n - 1) : 1), dash = dashes[i % 4].map(d => d * k);
+      c.save();
+      c.strokeStyle = col; c.lineWidth = 1.8 * k; c.setLineDash(dash);
+      c.beginPath(); fs.forEach((f, j) => (j ? c.lineTo : c.moveTo).call(c, PX(f), PY(v[f]))); c.stroke();
+      c.setLineDash([]); c.lineWidth = 1.6 * k;
+      for (const f of fs) marker(c, ear, PX(f), PY(v[f]), ms, col);
+      c.restore();
+      legend.push([a.label, col, dash]);
+    });
+    if (legend.length) {
+      const lh = 11 * k, lw = 105 * k, bx = x + 6 * k, by = y + h - 6 * k - lh * legend.length - 6 * k;
+      c.fillStyle = "rgba(255,255,255,.92)"; c.strokeStyle = "#bbb"; c.lineWidth = 0.6 * k;
+      c.fillRect(bx, by, lw, lh * legend.length + 6 * k); c.strokeRect(bx, by, lw, lh * legend.length + 6 * k);
+      c.font = `${7.5 * k}px Helvetica, Arial, sans-serif`; c.textAlign = "left"; c.textBaseline = "middle";
+      legend.forEach(([lab, col, dash], i) => {
+        const ly = by + 3 * k + lh * (i + 0.5);
+        c.strokeStyle = col; c.lineWidth = 1.8 * k; c.setLineDash(dash);
+        c.beginPath(); c.moveTo(bx + 5 * k, ly); c.lineTo(bx + 27 * k, ly); c.stroke(); c.setLineDash([]);
+        c.lineWidth = 1.4 * k; marker(c, ear, bx + 16 * k, ly, ms * 0.9, col);
+        c.fillStyle = "#222"; c.fillText(lab, bx + 33 * k, ly);
+      });
+    }
+  }
+  function marker(c, ear, x, y, r, col) {
+    c.strokeStyle = col;
+    if (ear === "right") {
+      c.fillStyle = "#fff"; c.beginPath(); c.arc(x, y, r, 0, 2 * Math.PI); c.fill(); c.stroke();
+    } else {
+      c.beginPath(); c.moveTo(x - r, y - r); c.lineTo(x + r, y + r); c.moveTo(x - r, y + r); c.lineTo(x + r, y - r); c.stroke();
+    }
+  }
+
+  function renderPage(list, patient) {
+    const k = 200 / 72;                         // 200 dpi
+    const cv = document.createElement("canvas");
+    cv.width = Math.round(842 * k); cv.height = Math.round(595 * k);
+    const c = cv.getContext("2d");
+    c.fillStyle = "#fff"; c.fillRect(0, 0, cv.width, cv.height);
+    const allv = list.flatMap(a => AG.EARS.flatMap(e => Object.values(a[e])));
+    const allf = [...new Set(list.flatMap(a => AG.EARS.flatMap(e => Object.keys(a[e]).map(Number))))].sort((p, q) => p - q);
+    const rng = { fmin: Math.min(125, ...allf), fmax: Math.max(8000, ...allf),
+      dbmin: Math.min(-10, ...allv), dbmax: Math.max(120, ...allv) };
+    c.textAlign = "center"; c.fillStyle = "#111";
+    c.font = `bold ${16 * k}px Helvetica, Arial, sans-serif`;
+    c.fillText("Audiogrammes superposés" + (patient ? " — " + patient : ""), cv.width / 2, 28 * k);
+    c.font = `${8.5 * k}px Helvetica, Arial, sans-serif`; c.fillStyle = "#666";
+    const today = new Date().toLocaleDateString("fr-FR");
+    c.fillText(`${list.length} examen(s) — du plus ancien (clair) au plus récent (foncé) — édité le ${today}`, cv.width / 2, 42 * k);
+
+    const ch = 255;
+    drawChart(c, k, 62 * k, 66 * k, 330 * k, ch * k, "right", list, rng);
+    drawChart(c, k, 470 * k, 66 * k, 330 * k, ch * k, "left", list, rng);
+    c.save(); c.translate(26 * k, (66 + ch / 2) * k); c.rotate(-Math.PI / 2);
+    c.font = `${8 * k}px Helvetica, Arial, sans-serif`; c.fillStyle = "#333"; c.textAlign = "center";
+    c.fillText("Seuil (dB HL)", 0, 0); c.restore();
+    c.save(); c.translate(434 * k, (66 + ch / 2) * k); c.rotate(-Math.PI / 2);
+    c.fillText("Seuil (dB HL)", 0, 0); c.restore();
+
+    // tableau
+    const rows = [];
+    for (const a of list) for (const e of AG.EARS) {
+      if (!Object.keys(a[e]).length) continue;
+      const p = AG.pta(a[e]);
+      rows.push({ e, cells: [a.label, e === "right" ? "OD" : "OG", ...allf.map(f => (a[e][f] == null ? "–" : fmt(a[e][f]))), p == null ? "–" : fmt(p)] });
+    }
+    const head = ["Examen", "Oreille", ...allf.map(flabel), "Perte moy."];
+    const tx = 30 * k, tw = 782 * k, ty = 368 * k;
+    const avail = 560 * k - ty;
+    const rh = Math.min(15 * k, avail / (rows.length + 1));
+    const w0 = 110 * k, w1 = 42 * k, wl = 60 * k, wf = (tw - w0 - w1 - wl) / Math.max(1, allf.length);
+    const widths = [w0, w1, ...allf.map(() => wf), wl];
+    const fs = Math.min(8 * k, rh * 0.6);
+    const drawRow = (cells, yy, bg, bold) => {
+      let xx = tx;
+      cells.forEach((t, i) => {
+        c.fillStyle = bg; c.fillRect(xx, yy, widths[i], rh);
+        c.strokeStyle = "#bbb"; c.lineWidth = 0.5 * k; c.strokeRect(xx, yy, widths[i], rh);
+        c.fillStyle = "#222"; c.font = `${bold ? "bold " : ""}${fs}px Helvetica, Arial, sans-serif`;
+        c.textAlign = "center"; c.textBaseline = "middle";
+        c.fillText(t, xx + widths[i] / 2, yy + rh / 2, widths[i] - 4);
+        xx += widths[i];
+      });
+    };
+    drawRow(head, ty, "#eeeeee", true);
+    rows.forEach((r, i) => drawRow(r.cells, ty + rh * (i + 1), r.e === "right" ? "#fdecea" : "#e8f0fd", false));
+    c.textAlign = "left"; c.textBaseline = "alphabetic"; c.fillStyle = "#777";
+    c.font = `${6.5 * k}px Helvetica, Arial, sans-serif`;
+    c.fillText("Perte moyenne : moyenne des seuils à 500, 1000, 2000 et 4000 Hz (BIAP). Valeurs lues automatiquement à l'écran puis validées.",
+      tx, 583 * k);
+    const text = ["Audiogrammes superposés" + (patient ? " - " + patient : ""), `Édité le ${today}`,
+      head.join(" | "), ...rows.map(r => r.cells.join(" | "))];
+    return { canvas: cv, text };
+  }
+
+  // ------------------------------------------------------------ écriture PDF (sans bibliothèque)
+  function buildPdf(jpeg, iw, ih, title, lines) {
+    const enc = s => {
+      const out = new Uint8Array(s.length);
+      for (let i = 0; i < s.length; i++) { const c = s.charCodeAt(i); out[i] = c < 256 ? c : (c === 0x2014 || c === 0x2013 ? 45 : 63); }
+      return out;
+    };
+    const esc = s => s.replace(/[–—]/g, "-").replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
+    const chunks = [], offs = [];
+    let pos = 0;
+    const put = b => { if (typeof b === "string") b = enc(b); chunks.push(b); pos += b.length; };
+    put("%PDF-1.4\n%\xE2\xE3\xCF\xD3\n");
+    const obj = (n, body) => { offs[n] = pos; put(`${n} 0 obj\n`); body(); put("\nendobj\n"); };
+    let content = "q 842 0 0 595 0 0 cm /Im0 Do Q\nBT 3 Tr /F1 6 Tf 20 585 Td 7 TL\n";
+    for (const l of lines) content += `(${esc(l)}) '\n`;
+    content += "ET";
+    const cbytes = enc(content);
+    obj(1, () => put("<< /Type /Catalog /Pages 2 0 R >>"));
+    obj(2, () => put("<< /Type /Pages /Kids [3 0 R] /Count 1 >>"));
+    obj(3, () => put("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 842 595] /Resources << /XObject << /Im0 5 0 R >> /Font << /F1 6 0 R >> >> /Contents 4 0 R >>"));
+    obj(4, () => { put(`<< /Length ${cbytes.length} >>\nstream\n`); put(cbytes); put("\nendstream"); });
+    obj(5, () => { put(`<< /Type /XObject /Subtype /Image /Width ${iw} /Height ${ih} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpeg.length} >>\nstream\n`); put(jpeg); put("\nendstream"); });
+    obj(6, () => put("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>"));
+    obj(7, () => put(`<< /Title (${esc(title)}) /Producer (Superposeur d'audiogrammes) >>`));
+    const xref = pos;
+    let x = "xref\n0 8\n0000000000 65535 f \n";
+    for (let n = 1; n <= 7; n++) x += String(offs[n]).padStart(10, "0") + " 00000 n \n";
+    put(x + `trailer\n<< /Size 8 /Root 1 0 R /Info 7 0 R >>\nstartxref\n${xref}\n%%EOF\n`);
+    return new Blob(chunks, { type: "application/pdf" });
+  }
+
+  const safeName = t => t.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "_");
+
+  async function superpose() {
+    if (!items.length) return;
+    status("Création du PDF…", "busy");
+    const patient = $("patient").value.trim();
+    const { canvas, text } = renderPage(items, patient);
+    const jpegBlob = await new Promise(r => canvas.toBlob(r, "image/jpeg", 0.92));
+    const jpeg = new Uint8Array(await jpegBlob.arrayBuffer());
+    const title = "Audiogrammes superposés" + (patient ? " - " + patient : "");
+    const blob = buildPdf(jpeg, canvas.width, canvas.height, title, text);
+    const d = new Date(), p2 = n => String(n).padStart(2, "0");
+    const name = `Audiogrammes_superposes_${safeName(patient) || "patient"}_${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}_${p2(d.getHours())}h${p2(d.getMinutes())}.pdf`;
+    invalidate();
+    pdf = { blob, name, url: URL.createObjectURL(blob) };
+    $("res-img").src = canvas.toDataURL("image/jpeg", 0.85);
+    $("res-name").textContent = name;
+    show("p-result");
+    $("btn-send").disabled = $("btn-dl").disabled = false;
+    status("PDF prêt. Vérifiez-le, puis cliquez sur Envoyer vers Doctolib.", "ok");
+  }
+
+  function download() {
+    if (!pdf) return;
+    const a = document.createElement("a");
+    a.href = pdf.url; a.download = pdf.name; document.body.appendChild(a); a.click(); a.remove();
+  }
+
+  async function chooseFolder() {
+    if (!window.showDirectoryPicker) { status("Ce navigateur ne permet pas d'écrire dans un dossier : utilisez Télécharger.", "err"); return null; }
+    try {
+      dirHandle = await window.showDirectoryPicker({ id: "doctolib", mode: "readwrite" });
+      await idbSet("dir", dirHandle);
+      showFolder();
+      return dirHandle;
+    } catch (e) { return null; }
+  }
+  function showFolder() { $("folder").textContent = dirHandle ? dirHandle.name : "pas encore choisi"; }
+
+  async function send() {
+    if (!pdf) return;
+    if (!window.showDirectoryPicker) { download(); status("PDF téléchargé : glissez-le dans le dossier d'import Doctolib.", "ok"); return; }
+    let h = dirHandle || await chooseFolder();
+    if (!h) { status("Choisissez le dossier d'import (passerelle) Doctolib.", "err"); return; }
+    try {
+      let perm = await h.queryPermission({ mode: "readwrite" });
+      if (perm !== "granted") perm = await h.requestPermission({ mode: "readwrite" });
+      if (perm !== "granted") { status("Chrome n'a pas reçu l'autorisation d'écrire dans le dossier.", "err"); return; }
+      const fh = await h.getFileHandle(pdf.name, { create: true });
+      const w = await fh.createWritable();
+      await w.write(pdf.blob); await w.close();
+    } catch (e) { status("Envoi impossible : " + e.message, "err"); return; }
+    status(`✔ Envoyé dans le dossier Doctolib « ${h.name} » : ${pdf.name}`, "ok");
+    $("res-sent").hidden = false;
+  }
+
+  function newPatient() {
+    if (items.length && !window.__noConfirm && !confirm("Effacer la liste et passer au patient suivant ?")) return;
+    items = []; $("patient").value = ""; invalidate(); renderList(); show("p-help");
+    $("res-sent").hidden = true;
+    status("Nouveau patient : affichez le premier audiogramme puis cliquez sur Capturer.", "");
+  }
+
+  // ------------------------------------------------------------ paramètres
+  function syncSettingsForm() {
+    for (const k of ["f_min", "f_max", "db_min", "db_max"]) $("st-" + k).value = S[k];
+    $("st-round").checked = !!S.round_5;
+  }
+  function saveSettingsForm() {
+    for (const k of ["f_min", "f_max", "db_min", "db_max"]) {
+      const v = parseFloat($("st-" + k).value.replace(",", ".")); if (!isNaN(v)) S[k] = v;
+    }
+    S.round_5 = $("st-round").checked; saveS();
+    status("Paramètres enregistrés.", "ok");
+  }
+
+  // ------------------------------------------------------------ branchements
+  $("btn-share").onclick = shareScreen;
+  $("btn-capture").onclick = capture;
+  $("btn-sup").onclick = superpose;
+  $("btn-send").onclick = send;
+  $("btn-dl").onclick = download;
+  $("btn-open").onclick = () => pdf && window.open(pdf.url, "_blank");
+  $("btn-folder").onclick = chooseFolder;
+  $("btn-new").onclick = newPatient;
+  $("btn-new2").onclick = newPatient;
+  $("rv-ok").onclick = validate;
+  $("rv-cancel").onclick = () => { current = null; show("p-help"); status("Annulé.", ""); };
+  $("rv-manual").onclick = () => { current.label = $("rv-label").value; openManual(); };
+  $("rv-reread").onclick = reread;
+  $("mn-cancel").onclick = () => { current = null; show("p-help"); status("Annulé.", ""); };
+  $("st-save").onclick = saveSettingsForm;
+  $("file").onchange = e => { const f = e.target.files[0]; if (f) importBlob(f); e.target.value = ""; };
+  $("p-review").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); validate(); } });
+  const mn = $("mn");
+  mn.onmousedown = e => { const [x, y] = mpos(e); drag = { x0: x, y0: y, x1: null, y1: null }; };
+  mn.onmousemove = e => { if (!drag) return; [drag.x1, drag.y1] = mpos(e); redrawManual(); };
+  window.addEventListener("mouseup", () => { if (drag && drag.x1 != null) manualDone(); else drag = null; });
+  document.addEventListener("paste", e => {
+    for (const it of e.clipboardData.items) if (it.type.startsWith("image/")) { importBlob(it.getAsFile()); e.preventDefault(); return; }
+  });
+  document.addEventListener("dragover", e => e.preventDefault());
+  document.addEventListener("drop", e => {
+    e.preventDefault();
+    const f = [...e.dataTransfer.files].find(f => f.type.startsWith("image/"));
+    if (f) importBlob(f);
+  });
+
+  idbGet("dir").then(h => { if (h) dirHandle = h; showFolder(); });
+  syncSettingsForm(); renderList(); updateSource(); show("p-help");
+  window.__app = { importBlob, superpose, send, validate, get items() { return items; }, get pdf() { return pdf; },
+    setDir(h) { dirHandle = h; showFolder(); }, processCanvas };
+})();
+
+</script>
+</body>
+</html>
