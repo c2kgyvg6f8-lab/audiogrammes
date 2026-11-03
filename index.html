@@ -82,10 +82,17 @@
   .chips input:checked + span { background:var(--acc); border-color:var(--acc); color:#fff; font-weight:600; }
   #mini { margin-top:8px; } #mini img { width:100%; border:1px solid var(--line); border-radius:6px; cursor:zoom-in; display:block; }
   .review { grid-template-columns:minmax(0,1fr) 360px; }
+  #clickhint { display:none; }
+  body.need-click #clickhint { display:flex; position:fixed; inset:0; z-index:50; background:rgba(20,28,38,.55); align-items:center; justify-content:center; cursor:pointer; }
+  #clickhint div { background:#fff; border-radius:14px; padding:22px 28px; font-size:17px; font-weight:650; box-shadow:0 10px 40px rgba(0,0,0,.25); text-align:center; }
+  #clickhint small { display:block; font-weight:400; font-size:13px; color:var(--mute); margin-top:6px; }
+  #pipnote { display:none; }
+  body.pip-open #pipnote { display:block; }
   @media (max-width: 900px) { .wrap { grid-template-columns:1fr; } aside { border-right:0; border-bottom:1px solid var(--line); } .review { grid-template-columns:1fr; } }
 </style>
 </head>
 <body>
+<div id="clickhint"><div>👆 Cliquez n'importe où pour ouvrir la petite fenêtre au premier plan<small>Chrome demande un clic avant de pouvoir l'ouvrir</small></div></div>
 <div class="wrap">
 <aside id="aside">
   <div class="top">
@@ -159,6 +166,10 @@
 
 <main>
   <video id="video" muted playsinline hidden></video>
+  <section id="pipnote" class="panel" style="margin-bottom:16px;background:#e6f4f1;border-color:#bfe3dc">
+    <b>La petite fenêtre est ouverte au premier plan.</b> Vous pouvez réduire cet onglet Chrome, mais ne le fermez pas :
+    la petite fenêtre en dépend. Les vérifications (✎) et le PDF s'affichent ici.
+  </section>
   <section id="p-help" class="panel help">
     <h2>Mode d'emploi</h2>
     <ol>
@@ -929,7 +940,7 @@ if (typeof module !== "undefined") module.exports = AG;
       if (controller && controller.setFocusBehavior) { try { controller.setFocusBehavior("no-focus-change"); } catch (e) {} }
     } catch (e) {
       stream = null;
-      status(pip ? "Le partage se choisit depuis l'onglet principal : cliquez sur ↩ puis sur Choisir la fenêtre." : "Partage annulé.", pip ? "err" : "");
+      status("Partage annulé.", "");
       return updateSource();
     }
     video.srcObject = stream;
@@ -943,7 +954,7 @@ if (typeof module !== "undefined") module.exports = AG;
     updateSource(surf);
     status(surf === "monitor"
       ? "Écran entier partagé : retardateur de 3 s activé pour laisser le temps d'afficher l'audiogramme."
-      : "Source partagée. Cliquez sur 📌 pour garder cette fenêtre au premier plan, puis capturez.", "ok");
+      : pip ? "Source partagée. Affichez un audiogramme puis cliquez sur Capturer." : "Source partagée. Cliquez sur 📌 pour garder cette fenêtre au premier plan, puis capturez.", "ok");
   }
 
   function updateSource(surf) {
@@ -957,6 +968,18 @@ if (typeof module !== "undefined") module.exports = AG;
 
   async function grabFrame() {
     if (!stream) throw new Error("aucune source partagée");
+    // ImageCapture lit l'image directement sur le flux : marche même si cet
+    // onglet est réduit ou en arrière-plan (fenêtre flottante seule visible)
+    if ("ImageCapture" in window) {
+      try {
+        const bmp = await new ImageCapture(stream.getVideoTracks()[0]).grabFrame();
+        const cv = document.createElement("canvas");
+        cv.width = bmp.width; cv.height = bmp.height;
+        cv.getContext("2d").drawImage(bmp, 0, 0);
+        bmp.close && bmp.close();
+        return cv;
+      } catch (e) { /* repli sur la vidéo */ }
+    }
     if (video.readyState < 2) await new Promise(r => video.addEventListener("loadeddata", r, { once: true }));
     await new Promise(r => setTimeout(r, 150));
     const cv = document.createElement("canvas");
@@ -1757,15 +1780,16 @@ if (typeof module !== "undefined") module.exports = AG;
   }
 
   // ------------------------------------------------------------ fenêtre flottante
-  async function openPip() {
-    if (pip) return;
+  async function openPip(silent) {
+    if (pip) return true;
     if (!("documentPictureInPicture" in window)) {
-      status("Cette version de Chrome ne propose pas la fenêtre flottante (Chrome 116 ou plus récent requis).", "err");
-      return;
+      if (!silent) status("Cette version de Chrome ne propose pas la fenêtre flottante (Chrome 116 ou plus récent requis).", "err");
+      return false;
     }
     try {
-      pip = await documentPictureInPicture.requestWindow({ width: 380, height: 760 });
-    } catch (e) { status("Fenêtre flottante refusée : " + e.message, "err"); pip = null; return; }
+      pip = await documentPictureInPicture.requestWindow({ width: 370, height: 720 });
+    } catch (e) { if (!silent) status("Fenêtre flottante refusée : " + e.message, "err"); pip = null; return false; }
+    document.body.classList.remove("need-click");
     for (const st of document.querySelectorAll("style")) pip.document.head.appendChild(st.cloneNode(true));
     pip.document.title = "Audiogrammes";
     pip.document.body.classList.add("pip");
@@ -1783,7 +1807,26 @@ if (typeof module !== "undefined") module.exports = AG;
       document.body.classList.remove("pip-open");
       const t = document.getElementById("thumb"); if (stream) { t.srcObject = stream; t.play().catch(() => {}); }
     });
-    status("Fenêtre flottante ouverte : elle reste au-dessus de Doctolib.", "ok");
+    status(stream ? "Fenêtre flottante ouverte : elle reste au-dessus de Doctolib." : "Choisissez maintenant la fenêtre Doctolib à lire.", "ok");
+    return true;
+  }
+
+  // Ouverture directe en petite fenêtre au premier plan. Chrome n'autorise
+  // l'ouverture qu'après un geste de l'utilisateur : si l'essai automatique
+  // est refusé, le premier clic n'importe où sur la page l'ouvre.
+  async function autoPip() {
+    if (await openPip(true)) return;
+    if (!("documentPictureInPicture" in window)) return;
+    document.body.classList.add("need-click");
+    const once = async e => {
+      if (pip) return;
+      if (e.target && e.target.closest && e.target.closest("#btn-unpip")) return;
+      document.removeEventListener("pointerdown", once, true);
+      document.removeEventListener("keydown", once, true);
+      if (!(await openPip())) document.body.classList.remove("need-click");
+    };
+    document.addEventListener("pointerdown", once, true);
+    document.addEventListener("keydown", once, true);
   }
   function closePip() { if (pip) pip.close(); }
 
@@ -1816,7 +1859,7 @@ if (typeof module !== "undefined") module.exports = AG;
   $("btn-send").onclick = send;
   $("btn-folder").onclick = chooseFolder;
   $("btn-new").onclick = newPatient;
-  $("btn-pip").onclick = openPip;
+  $("btn-pip").onclick = () => openPip();
   $("btn-unpip").onclick = closePip;
   $("st-save").onclick = saveSettingsForm;
   for (const id of ["show-air", "show-bone", "show-voc"]) $(id).onchange = onShowChange;
@@ -1848,6 +1891,7 @@ if (typeof module !== "undefined") module.exports = AG;
 
   idbGet("dir").then(h => { if (h) dirHandle = h; showFolder(); });
   syncSettingsForm(); renderList(); updateSource(""); show("p-help");
+  autoPip();
   window.__app = { get busy() { return busy; }, OCR, importBlob, superpose, send, openPip, get items() { return items; }, get pdf() { return pdf; },
     get pip() { return pip; }, setDir(h) { dirHandle = h; showFolder(); }, processCanvas };
 })();
