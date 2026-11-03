@@ -1488,7 +1488,7 @@ if (typeof module !== "undefined") module.exports = AG;
     c.strokeStyle = "#888"; c.lineWidth = 0.9 * k; c.beginPath(); c.moveTo(x, PY(50)); c.lineTo(x + w, PY(50)); c.stroke();
     c.strokeStyle = "#555"; c.lineWidth = 0.8 * k; c.strokeRect(x, y, w, h);
     c.textAlign = "center"; c.textBaseline = "alphabetic";
-    font(c, k, 11, true); c.fillStyle = "#000"; c.fillText("vocale", x + w / 2, y - 6 * k);
+    font(c, k, 11, true); c.fillStyle = "#000"; c.fillText("Audiométrie vocale", x + w / 2, y - 6 * k);
     font(c, k, 8); c.fillText("Intensité (dB)", x + w / 2, y + h + 20 * k);
     c.save(); c.translate(x - 24 * k, y + h / 2); c.rotate(-Math.PI / 2); c.fillText("Intelligibilité (%)", 0, 0); c.restore();
     const n = list.length, legend = [];
@@ -1582,7 +1582,7 @@ if (typeof module !== "undefined") module.exports = AG;
     c.fillText(`${JOURS[now.getDay()]} ${now.getDate()} ${MOIS_L[now.getMonth()]} ${now.getFullYear()}`, 17 * k, 82 * k);
     font(c, k, 7.5); c.fillStyle = "#555";
     const shown = [opts.air && "aérienne", opts.bone && "osseuse", opts.voc && "vocale"].filter(Boolean).join(", ") || "aucune courbe";
-    c.fillText(`Audiogramme comparatif — audiométrie ${[A && "tonale", V && "vocale"].filter(Boolean).join(" et ") || "tonale"} — examens du ${list.map(a => a.label).join(", ")} (du plus clair au plus foncé)`, 18 * k, 97 * k, 560 * k);
+    c.fillText(`Bilan audiométrique comparatif — examens du ${list.map(a => a.label).join(", ")} (du plus clair au plus foncé)`, 18 * k, 96 * k, 560 * k);
 
     // --- tableau des seuils
     const rows = [];
@@ -1605,6 +1605,8 @@ if (typeof module !== "undefined") module.exports = AG;
     // --- graphiques, aux mêmes emplacements que sur l'audiogramme d'origine
     const o2 = { ...opts, titles: { right: "DROITE", left: "GAUCHE" } };
     if (A) {
+      c.textAlign = "center"; c.fillStyle = "#000"; font(c, k, 12, true);
+      c.fillText("Audiométrie tonale", PW / 2 * k, 109 * k);
       drawChart(c, k, 34 * k, 127 * k, 241 * k, 265 * k, "right", list, rng, o2);
       drawChart(c, k, 345 * k, 127 * k, 244 * k, 265 * k, "left", list, rng, o2);
       if (V) {
@@ -1620,7 +1622,7 @@ if (typeof module !== "undefined") module.exports = AG;
     }
     for (const r of vrows) text.push(r.cells.join(" | "));
     c.textAlign = "left"; c.textBaseline = "alphabetic"; c.fillStyle = "#777"; font(c, k, 6);
-    c.fillText("Audiogramme — CA = conduction aérienne, CO = conduction osseuse. Perte moyenne : moyenne 500, 1000, 2000 et 4000 Hz (BIAP).", 20 * k, 830 * k);
+    c.fillText("Bilan audiométrique — CA = conduction aérienne, CO = conduction osseuse. Perte moyenne : moyenne 500, 1000, 2000 et 4000 Hz (BIAP).", 20 * k, 830 * k);
     return { canvas: cv, text, pw: PW, ph: PH };
   }
   function yLabel(c, k, x, y) {
@@ -1669,7 +1671,7 @@ if (typeof module !== "undefined") module.exports = AG;
     obj(4, () => { put(`<< /Length ${cbytes.length} >>\nstream\n`); put(cbytes); put("\nendstream"); });
     obj(5, () => { put(`<< /Type /XObject /Subtype /Image /Width ${iw} /Height ${ih} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpeg.length} >>\nstream\n`); put(jpeg); put("\nendstream"); });
     obj(6, () => put("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>"));
-    obj(7, () => put(`<< /Title (${esc(title)}) /Subject (Audiogramme - audiometrie tonale et vocale) /Keywords (audiogramme audiometrie ORL) /Creator (Audiometrie) >>`));
+    obj(7, () => put(`<< /Title (${esc(title)}) /Subject (Bilan audiométrique - audiométrie tonale et vocale) /Keywords (bilan audiométrique audiogramme audiométrie ORL) /Creator (Audiometrie) >>`));
     const xref = pos;
     let x = "xref\n0 8\n0000000000 65535 f \n";
     for (let n = 1; n <= 7; n++) x += String(offs[n]).padStart(10, "0") + " 00000 n \n";
@@ -1685,11 +1687,11 @@ if (typeof module !== "undefined") module.exports = AG;
     const { canvas, text, pw, ph } = renderPage(items, ident, opts());
     const jpegBlob = await new Promise(r => canvas.toBlob(r, "image/jpeg", 0.92));
     const jpeg = new Uint8Array(await jpegBlob.arrayBuffer());
-    const blob = buildPdf(jpeg, canvas.width, canvas.height, `Audiogramme ${ident.nom} ${ident.prenom}`.trim(), [], pw, ph);
+    const blob = buildPdf(jpeg, canvas.width, canvas.height, `Bilan audiométrique ${ident.nom} ${ident.prenom}`.trim(), [], pw, ph);
     const d = new Date(), p2 = n => String(n).padStart(2, "0");
     // même convention que les fichiers de l'audiomètre : NOM_PRENOM_Audiogramme_AAAA-MM-JJ.pdf
     const up = s => safeName(s || "").toUpperCase();
-    const name = `${[up(ident.nom) || "PATIENT", up(ident.prenom)].filter(Boolean).join("_")}_Audiogramme_${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}.pdf`;
+    const name = `${[up(ident.nom) || "PATIENT", up(ident.prenom)].filter(Boolean).join("_")}_Bilan_audiométrique_${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}.pdf`;
     invalidate();
     pdf = { blob, name, url: URL.createObjectURL(blob) };
     document.getElementById("res-img").src = canvas.toDataURL("image/jpeg", 0.85);
