@@ -3,7 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Superposeur d'audiogrammes</title>
+<title>Audiogrammes</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<meta name="theme-color" content="#0b7a6f">
 <style>
   :root { --od:#c62828; --og:#1565c0; --ink:#1d2430; --mute:#667085; --line:#e3e6eb; --bg:#f5f6f8;
           --acc:#0b7a6f; --acc2:#0a6359; --card:#fff; }
@@ -89,10 +92,15 @@
   #pipnote { display:none; }
   body.pip-open #pipnote { display:block; }
   /* ---- petite fenêtre ---- */
-  #blockedhint, #openedhint { display:none; }
-  body.blocked #blockedhint, body.opened #openedhint { display:flex; position:fixed; inset:0; z-index:50; background:rgba(20,28,38,.55); align-items:center; justify-content:center; cursor:pointer; }
-  #blockedhint div, #openedhint div { background:#fff; border-radius:14px; padding:22px 28px; font-size:16px; font-weight:650; max-width:460px; text-align:center; box-shadow:0 10px 40px rgba(0,0,0,.25); }
-  #blockedhint small, #openedhint small { display:block; font-weight:400; font-size:13px; color:var(--mute); margin-top:8px; }
+  #clickhint { display:none; }
+  body.need-click #clickhint { display:flex; position:fixed; inset:0; z-index:50; background:rgba(20,28,38,.55); align-items:center; justify-content:center; cursor:pointer; }
+  #clickhint div { background:#fff; border-radius:14px; padding:18px 22px; font-size:16px; font-weight:650; max-width:300px; text-align:center; box-shadow:0 10px 40px rgba(0,0,0,.25); }
+  #clickhint small { display:block; font-weight:400; font-size:12.5px; color:var(--mute); margin-top:8px; }
+  #mainnote, #installnote { display:none; margin-bottom:14px; font-size:13px; }
+  body.tab #installnote { display:block; background:#fff8e1; border-color:#f3dc9b; }
+  body.pip-open #mainnote { display:block; background:#e6f4f1; border-color:#bfe3dc; }
+  body.pip-open #p-help { display:none; }
+  body.pip-open .wrap { grid-template-columns:1fr; }
   .watch { display:flex; align-items:center; gap:6px; font-size:12px; flex-wrap:wrap; }
   .watch span:nth-child(2) { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .watch button { padding:2px 8px; font-size:12px; }
@@ -119,18 +127,17 @@
   body.popup #mini img { max-height:200px; object-fit:contain; }
   body.popup details { font-size:11.5px; } body.popup .grid2 { grid-template-columns:1fr 54px; }
   body.popup main { display:none; }
+  body.popup.pip-open main { display:block; padding:10px; }
   body.popup.big .wrap { display:grid; grid-template-columns:330px 1fr; }
   body.popup.big main { display:block; padding:14px 16px; }
   @media (max-width: 900px) { .wrap { grid-template-columns:1fr; } aside { border-right:0; border-bottom:1px solid var(--line); } .review { grid-template-columns:1fr; } }
 </style>
 </head>
 <body>
-<div id="blockedhint"><div>Chrome a bloqué l'ouverture de la petite fenêtre.<br>Cliquez n'importe où pour l'ouvrir.
-  <small>Pour ne plus voir ce message : icône <b>⧉</b> (pop-up bloqué) à droite de la barre d'adresse › « Toujours autoriser les pop-ups »</small></div></div>
-<div id="openedhint"><div>✔ L'outil est ouvert dans sa petite fenêtre, en haut à droite.<small>Vous pouvez fermer cet onglet.</small></div></div>
+<div id="clickhint"><div>👆 Cliquez n'importe où<small>pour ouvrir la petite fenêtre qui reste au premier plan, au-dessus de Doctolib.<br>Chrome exige ce clic à chaque ouverture.</small></div></div>
 <div class="wrap">
 <aside id="aside">
-  <h1>Audiogrammes superposés</h1>
+  <h1>Audiogrammes</h1>
 
   <div>
     <label class="f" for="patient">Patient</label>
@@ -183,6 +190,18 @@
 </aside>
 
 <main>
+  <section id="mainnote" class="panel">
+    <b>Audiogrammes — fenêtre principale.</b> Ne la fermez pas : la petite fenêtre au premier plan en dépend.
+    Elle s'agrandit toute seule pour vérifier un examen ou montrer le PDF.
+  </section>
+  <section id="installnote" class="panel">
+    <b>Le plus simple sous Windows :</b> téléchargez le <a href="Audiogrammes-lanceur.zip">lanceur</a>, dézippez-le et placez
+    <b>Audiogrammes.cmd</b> sur le bureau. Un double-clic ouvre l'outil seul, sans onglet, dans sa petite fenêtre en haut à droite,
+    qui reste au premier plan même au-dessus de Doctolib.<br><br>
+    <b>Sinon, pour ne plus avoir d'onglet :</b> installez l'outil comme une application — icône <b>⊕ Installer</b> à droite de la barre d'adresse
+    (ou menu ⋮ › Caster, enregistrer et partager › Installer la page en tant qu'appli). Une icône « Audiogrammes » apparaît alors sur le bureau :
+    elle ouvre l'outil directement dans sa petite fenêtre, en haut à droite, sans onglet.
+  </section>
   <section id="p-help" class="panel help">
     <h2>Mode d'emploi</h2>
     <ol>
@@ -894,7 +913,8 @@ if (typeof module !== "undefined") module.exports = AG;
 /* Interface : import automatique des PDF téléchargés, petite fenêtre en haut à droite,
    affichage aérienne / osseuse / vocale, PDF superposé, envoi Doctolib. */
 (() => {
-  const $ = id => document.getElementById(id);
+  let pip = null;                                   // fenêtre toujours au premier plan (Document PiP)
+  const $ = id => document.getElementById(id) || (pip && pip.document.getElementById(id));
   const EAR_NAME = { right: "Oreille droite", left: "Oreille gauche" };
   const EAR_COL = { right: "#c62828", left: "#1565c0" };
   const BONE = { right: "boneRight", left: "boneLeft" }, VOC = { right: "vocRight", left: "vocLeft" };
@@ -924,6 +944,14 @@ if (typeof module !== "undefined") module.exports = AG;
   let items = [];       // {label, right, left, boneRight, boneLeft, vocRight, vocLeft, canvas, grids, vgrid}
   let current = null;   // audiogramme ouvert dans « Modifier » ou en encadrement manuel
   let pdf = null;
+  let ident = { nom: "", prenom: "", dob: "" };   // patient, tel que reconnu par Doctolib
+  function identFromField() {
+    const ws = $("patient").value.trim().split(/\s+/).filter(Boolean);
+    const up = ws.filter(w => w === w.toUpperCase() && /[A-ZÀ-Ý]/.test(w));
+    const nom = up.length ? up.join(" ") : (ws[0] || "");
+    const prenom = ws.filter(w => !up.includes(w) && w !== nom).join(" ");
+    return { nom: nom.toUpperCase(), prenom: prenom.toUpperCase() };
+  }
   let dirHandle = null;
 
   const status = (t, kind) => { const el = $("status"); el.textContent = t; el.className = "status " + (kind || ""); };
@@ -993,9 +1021,12 @@ if (typeof module !== "undefined") module.exports = AG;
     }
     // nom et date : d'abord dans le nom du fichier (NOM_PRENOM_Audiogramme_AAAA-MM-JJ.pdf), sinon lus sur la page
     let info = OCR.parse((meta.fileName || "").replace(/\.pdf$/i, ""));
-    if (!info.name || !info.date) {
-      status("Lecture du nom et de la date…", "busy");
-      try { const o = await OCR.read(res.canvas || cv, res.grids); info = { name: info.name || o.name, date: info.date || o.date }; } catch (e) {}
+    if (!info.name || !info.date || !ident.dob) {
+      status("Lecture de l'en-tête (patient, date de naissance)…", "busy");
+      try {
+        const o = await OCR.read(res.canvas || cv, res.grids);
+        info = { name: info.name || o.name, nom: info.nom || o.nom, prenom: info.prenom || o.prenom, date: info.date || o.date, dob: o.dob };
+      } catch (e) {}
     }
     return place({ ...data, canvas: res.canvas || cv, grids: res.grids, vgrid: res.vgridV || res.vgrid, vcanvas: res.vcanvas || res.canvas || cv }, info);
   }
@@ -1007,13 +1038,17 @@ if (typeof module !== "undefined") module.exports = AG;
     if (info.name) {
       const cur = $("patient").value.trim();
       const surname = s => normName((s || "").split(/\s+/).filter(w => w === w.toUpperCase()).join(" ") || s);
-      if (!cur) $("patient").value = info.name;
+      if (!cur) { $("patient").value = info.name; ident = { nom: info.nom || "", prenom: info.prenom || "", dob: info.dob || "" }; }
       else if (surname(cur) !== surname(info.name)) {
         // autre patient : on repart d'une liste vide pour ne jamais mélanger deux patients
         if (items.length) { resetPatient(); warn = ` Nouveau patient : ${info.name} (liste de « ${cur} » fermée).`; }
         $("patient").value = info.name;
-      } else if (info.name.length > cur.length && normName(info.name).startsWith(normName(cur))) $("patient").value = info.name;
-    }
+        ident = { nom: info.nom || "", prenom: info.prenom || "", dob: info.dob || "" };
+      } else {
+        if (info.name.length > cur.length && normName(info.name).startsWith(normName(cur))) $("patient").value = info.name;
+        ident = { nom: ident.nom || info.nom || "", prenom: ident.prenom || info.prenom || "", dob: ident.dob || info.dob || "" };
+      }
+    } else if (info.dob && !ident.dob) ident.dob = info.dob;
     // examen visé : celui de la même date, sinon le dernier importé
     const last = (info.date && items.find(i => i.date === info.date)) || (items.includes(lastAdded) ? lastAdded : null);
     const sameDate = info.date && last && last.date === info.date;
@@ -1106,7 +1141,11 @@ if (typeof module !== "undefined") module.exports = AG;
         // garde uniquement les mots en majuscules du nom (un nom composé reste entier)
         nom = nom.split(/\s+/).filter(w => /^[A-ZÀ-Ý'-]{2,}$/.test(w)).slice(0, 3).join(" ");
       }
-      if (nom) out.name = nom + (prenom ? " " + cap(prenom) : "");
+      if (nom) { out.name = nom + (prenom ? " " + cap(prenom) : ""); out.nom = nom; out.prenom = prenom ? prenom.toUpperCase() : ""; }
+      for (const l of plines) {
+        const m = /naiss\w*\s*[:.]?\s*(?:le\s*)?(\d{2})[\/.](\d{2})[\/.](\d{4})/i.exec(l);
+        if (m) { out.dob = `${m[1]}/${m[2]}/${m[3]}`; break; }
+      }
       // date de l'examen (jamais celle de naissance)
       for (const l of plines) {
         if (/naiss/i.test(l)) continue;
@@ -1493,7 +1532,7 @@ if (typeof module !== "undefined") module.exports = AG;
     rows.forEach((r, i) => drawRow(r.cells, ty + rh * (i + 1), r.bg, false));
   }
 
-  function renderPage(list, patient, opts, k = 200 / 72) {
+  function renderPage(list, who, opts, k = 200 / 72) {
     const cv = document.createElement("canvas");
     cv.width = Math.round(842 * k); cv.height = Math.round(595 * k);
     const c = cv.getContext("2d");
@@ -1503,13 +1542,17 @@ if (typeof module !== "undefined") module.exports = AG;
     const allv = list.flatMap(a => keys.flatMap(e => Object.values(a[e] || {})));
     const allf = [...new Set(list.flatMap(a => keys.flatMap(e => Object.keys(a[e] || {}).map(Number))))].sort((p, q) => p - q);
     const rng = { fmin: Math.min(125, ...allf), fmax: Math.max(8000, ...allf), dbmin: Math.min(-10, ...allv), dbmax: Math.max(120, ...allv) };
-    c.textAlign = "center"; c.fillStyle = "#111";
-    font(c, k, 16, true);
-    c.fillText("Audiogrammes superposés" + (patient ? " — " + patient : ""), cv.width / 2, 26 * k);
-    font(c, k, 8.5); c.fillStyle = "#666";
+    // en-tête au format reconnu par l'import Doctolib : Nom, Prénom, Date de naissance, puis « Audiogramme »
     const today = new Date().toLocaleDateString("fr-FR");
+    c.fillStyle = "#111"; c.textAlign = "left"; font(c, k, 10.5, true);
+    const idLine = [`Nom : ${who.nom || "—"}`, `Prénom : ${who.prenom || "—"}`, who.dob ? `Date de naissance : ${who.dob}` : ""].filter(Boolean);
+    let ix = 30 * k;
+    for (const s of idLine) { c.fillText(s, ix, 17 * k); ix += c.measureText(s).width + 22 * k; }
+    c.textAlign = "center"; font(c, k, 16, true);
+    c.fillText("Audiogramme", cv.width / 2, 33 * k);
+    font(c, k, 8); c.fillStyle = "#666";
     const shown = [opts.air && "aérienne", opts.bone && "osseuse", opts.voc && "vocale"].filter(Boolean).join(", ") || "aucune courbe";
-    c.fillText(`${list.length} examen(s) — ${shown} — du plus ancien (clair) au plus récent (foncé) — édité le ${today}`, cv.width / 2, 39 * k);
+    c.fillText(`Comparaison de ${list.length} examen(s) : ${list.map(a => a.label).join(", ")} — ${shown} — du plus ancien (clair) au plus récent (foncé) — édité le ${today}`, cv.width / 2, 44 * k, 780 * k);
 
     // tableau des seuils
     const rows = [];
@@ -1521,7 +1564,8 @@ if (typeof module !== "undefined") module.exports = AG;
         cells: [a.label, e === "right" ? "OD" : "OG", typ, ...allf.map(f => (v[f] == null ? "–" : fmt(v[f]))), p == null ? "–" : fmt(p)] });
     }
     const head = ["Examen", "Or.", "", ...allf.map(flabel), "Perte moy."];
-    const text = ["Audiogrammes superposés" + (patient ? " - " + patient : ""), `Édité le ${today}`, head.join(" | "), ...rows.map(r => r.cells.join(" | "))];
+    const text = [`Nom ${who.nom || ""}`, `Prénom ${who.prenom || ""}`, ...(who.dob ? [`Date de naissance ${who.dob}`] : []), "Audiogramme",
+      `Date ${today}`, head.join(" | "), ...rows.map(r => r.cells.join(" | "))];
 
     if (A && !V) {
       drawChart(c, k, 62 * k, 66 * k, 330 * k, 255 * k, "right", list, rng, opts);
@@ -1568,7 +1612,7 @@ if (typeof module !== "undefined") module.exports = AG;
   function refreshPreview() {
     const box = $("mini");
     if (!items.length) { box.hidden = true; return; }
-    const { canvas } = renderPage(items, $("patient").value.trim(), opts(), 1.7);
+    const { canvas } = renderPage(items, ident, opts(), 1.7);
     $("mini-img").src = canvas.toDataURL("image/png");
     box.hidden = false;
   }
@@ -1609,13 +1653,14 @@ if (typeof module !== "undefined") module.exports = AG;
   async function superpose(showIt = true) {
     if (!items.length) return;
     status("Création du PDF…", "busy");
-    const patient = $("patient").value.trim();
-    const { canvas, text } = renderPage(items, patient, opts());
+    const { canvas, text } = renderPage(items, ident, opts());
     const jpegBlob = await new Promise(r => canvas.toBlob(r, "image/jpeg", 0.92));
     const jpeg = new Uint8Array(await jpegBlob.arrayBuffer());
-    const blob = buildPdf(jpeg, canvas.width, canvas.height, "Audiogrammes superposés" + (patient ? " - " + patient : ""), text);
+    const blob = buildPdf(jpeg, canvas.width, canvas.height, `${ident.nom} ${ident.prenom} Audiogramme`.trim(), text);
     const d = new Date(), p2 = n => String(n).padStart(2, "0");
-    const name = `Audiogrammes_superposes_${safeName(patient) || "patient"}_${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}_${p2(d.getHours())}h${p2(d.getMinutes())}.pdf`;
+    // même convention que les fichiers de l'audiomètre : NOM_PRENOM_Audiogramme_AAAA-MM-JJ.pdf
+    const up = s => safeName(s || "").toUpperCase();
+    const name = `${[up(ident.nom) || "PATIENT", up(ident.prenom)].filter(Boolean).join("_")}_Audiogramme_${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}.pdf`;
     invalidate();
     pdf = { blob, name, url: URL.createObjectURL(blob) };
     document.getElementById("res-img").src = canvas.toDataURL("image/jpeg", 0.85);
@@ -1666,7 +1711,7 @@ if (typeof module !== "undefined") module.exports = AG;
   }
 
   function resetPatient() {
-    items = []; lastAdded = null; $("patient").value = ""; invalidate(); renderList(); refreshPreview(); show("p-help");
+    items = []; lastAdded = null; $("patient").value = ""; ident = { nom: "", prenom: "", dob: "" }; invalidate(); renderList(); refreshPreview(); show("p-help");
   }
   function newPatient() {
     if (items.length && !window.__noConfirm && !confirm("Effacer la liste et passer au patient suivant ?")) return;
@@ -1748,35 +1793,85 @@ if (typeof module !== "undefined") module.exports = AG;
     } finally { scanning = false; }
   }
 
-  // ------------------------------------------------------------ petite fenêtre en haut à droite
+  // ------------------------------------------------------------ fenêtres
+  // Application installée (sans onglet) : sa fenêtre se place en haut à droite.
+  // Les commandes passent dans une petite fenêtre « toujours au premier plan »
+  // (seule sorte de fenêtre que Chrome garde au-dessus des autres logiciels,
+  // y compris Doctolib) ; Chrome exige un clic pour l'ouvrir.
+  // ouverte par le lanceur Windows (Audiogrammes.cmd) : fenêtre sans onglet, que le
+  // lanceur garde lui-même au premier plan → pas besoin de la fenêtre flottante
+  const viaLauncher = new URLSearchParams(location.search).has("fenetre");
+  const isApp = viaLauncher || matchMedia("(display-mode: standalone)").matches || matchMedia("(display-mode: window-controls-overlay)").matches;
   const SMALL = { w: 330, h: Math.min(860, screen.availHeight || 860) };
-  const isPopup = window.name === "audiogrammes";
-  function placeWin(w, h) {
-    try { window.resizeTo(w, h); window.moveTo((screen.availLeft || 0) + screen.availWidth - w, screen.availTop || 0); } catch (e) {}
+  function placeWin(w, h, where) {
+    if (!isApp) return;
+    try {
+      window.resizeTo(w, h);
+      const x = where === "bottom-left" ? (screen.availLeft || 0) : (screen.availLeft || 0) + screen.availWidth - w;
+      const y = where === "bottom-left" ? (screen.availTop || 0) + screen.availHeight - h : (screen.availTop || 0);
+      window.moveTo(x, y);
+    } catch (e) {}
   }
+  // grande fenêtre pour vérifier un examen / voir le PDF, sinon discrète
   function big(on) {
-    if (!isPopup) return;
     document.body.classList.toggle("big", on);
-    if (on) placeWin(Math.min(1180, screen.availWidth), Math.min(900, screen.availHeight));
+    if (!isApp) return;
+    if (on) { placeWin(Math.min(1180, screen.availWidth), Math.min(900, screen.availHeight)); window.focus(); }
+    else if (pip) placeWin(360, 140, "bottom-left");
     else placeWin(SMALL.w, SMALL.h);
   }
-  function openSmallWindow() {
-    const left = (screen.availLeft || 0) + screen.availWidth - SMALL.w, top = screen.availTop || 0;
-    return window.open(location.href.split("#")[0], "audiogrammes",
-      `popup=yes,width=${SMALL.w},height=${SMALL.h},left=${left},top=${top}`);
+
+  async function openPip() {
+    if (pip) return true;
+    if (!("documentPictureInPicture" in window)) {
+      status("Cette version de Chrome ne propose pas la fenêtre au premier plan (Chrome 116 ou plus récent requis).", "err");
+      return false;
+    }
+    try { pip = await documentPictureInPicture.requestWindow({ width: SMALL.w, height: Math.min(820, SMALL.h) }); }
+    catch (e) { pip = null; return false; }
+    document.body.classList.remove("need-click");
+    for (const st of document.querySelectorAll("style")) pip.document.head.appendChild(st.cloneNode(true));
+    pip.document.title = "Audiogrammes";
+    pip.document.body.classList.add("pip", "popup");
+    pip.document.body.appendChild(document.getElementById("aside"));
+    document.body.classList.add("pip-open");
+    pip.document.addEventListener("dragover", e => e.preventDefault());
+    pip.document.addEventListener("drop", onDrop);
+    pip.addEventListener("pagehide", () => {
+      const a = pip.document.getElementById("aside");
+      document.querySelector(".wrap").prepend(a);
+      pip = null;
+      document.body.classList.remove("pip-open");
+      big(false);
+      armPip();
+    });
+    // la fenêtre principale se fait toute petite, en bas à gauche
+    if (document.getElementById("p-help").hidden === false) big(false);
+    return true;
   }
-  function setupWindow() {
-    if (isPopup) { document.body.classList.add("popup"); placeWin(SMALL.w, SMALL.h); return; }
-    if (window.__noPopup) return;
-    const w = openSmallWindow();
-    if (w) { document.body.classList.add("opened"); try { window.close(); } catch (e) {} return; }
-    // fenêtre bloquée : Chrome ne l'autorise qu'après un clic, ou si les pop-ups sont permis pour ce site
-    document.body.classList.add("blocked");
-    const once = () => {
+  function armPip() {
+    if (!("documentPictureInPicture" in window)) return;
+    document.body.classList.add("need-click");
+    const once = async e => {
+      if (pip) return;
       document.removeEventListener("pointerdown", once, true);
-      if (openSmallWindow()) { document.body.classList.remove("blocked"); document.body.classList.add("opened"); try { window.close(); } catch (e) {} }
+      document.removeEventListener("keydown", once, true);
+      if (!(await openPip())) document.body.classList.remove("need-click");
     };
     document.addEventListener("pointerdown", once, true);
+    document.addEventListener("keydown", once, true);
+  }
+  function setupWindow() {
+    if (viaLauncher) {
+      document.body.classList.add("popup", "app", "launcher");
+      document.title = "Audiogrammes - fenetre";      // titre repéré par le lanceur
+      placeWin(SMALL.w, SMALL.h);
+      return;
+    }
+    if (isApp) document.body.classList.add("popup", "app");
+    else document.body.classList.add("tab");
+    placeWin(SMALL.w, SMALL.h);
+    armPip();
   }
 
   // ------------------------------------------------------------ paramètres
@@ -1806,7 +1901,7 @@ if (typeof module !== "undefined") module.exports = AG;
   $("btn-resume").onclick = resumeWatch;
   $("st-save").onclick = saveSettingsForm;
   for (const id of ["show-air", "show-bone", "show-voc"]) $(id).onchange = onShowChange;
-  $("patient").oninput = () => { invalidate(); schedulePreview(); };
+  $("patient").oninput = () => { ident = { ...identFromField(), dob: ident.dob }; invalidate(); schedulePreview(); };
   $("mini-img").onclick = () => superpose();
   $("file").onchange = async e => { const fs = [...e.target.files]; e.target.value = ""; for (const f of fs) await importFile(f); };
   const g = id => document.getElementById(id);
@@ -1835,10 +1930,13 @@ if (typeof module !== "undefined") module.exports = AG;
   syncSettingsForm(); renderList(); show("p-help");
   setupWindow();
   restoreWatch();
-  window.__app = { get busy() { return busy; }, OCR, importFile, superpose, send, get items() { return items; }, get pdf() { return pdf; },
+  window.__app = { get pip() { return pip; }, openPip, get busy() { return busy; }, OCR, importFile, superpose, send, get items() { return items; }, get pdf() { return pdf; },
     setDir(h) { dirHandle = h; showFolder(); }, setWatch(h) { watchHandle = h; return startWatch(); }, scan: () => scan(), processCanvas };
 })();
 
+</script>
+<script>
+if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
 </script>
 </body>
 </html>
