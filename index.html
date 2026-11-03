@@ -88,46 +88,70 @@
   #clickhint small { display:block; font-weight:400; font-size:13px; color:var(--mute); margin-top:6px; }
   #pipnote { display:none; }
   body.pip-open #pipnote { display:block; }
+  /* ---- petite fenêtre ---- */
+  #blockedhint, #openedhint { display:none; }
+  body.blocked #blockedhint, body.opened #openedhint { display:flex; position:fixed; inset:0; z-index:50; background:rgba(20,28,38,.55); align-items:center; justify-content:center; cursor:pointer; }
+  #blockedhint div, #openedhint div { background:#fff; border-radius:14px; padding:22px 28px; font-size:16px; font-weight:650; max-width:460px; text-align:center; box-shadow:0 10px 40px rgba(0,0,0,.25); }
+  #blockedhint small, #openedhint small { display:block; font-weight:400; font-size:13px; color:var(--mute); margin-top:8px; }
+  .watch { display:flex; align-items:center; gap:6px; font-size:12px; flex-wrap:wrap; }
+  .watch span:nth-child(2) { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .watch button { padding:2px 8px; font-size:12px; }
+  .dot { width:9px; height:9px; border-radius:50%; background:#c4c9d1; flex:none; }
+  .dot.on { background:#12a150; box-shadow:0 0 0 3px #d6f2e2; } .dot.paused { background:#e0a100; }
+  .lnk { text-decoration:underline; cursor:pointer; }
+  .sub { text-transform:none; font-weight:400; letter-spacing:0; }
+  .row2 { display:flex; gap:6px; } .row2 button { flex:1; padding:8px 6px; font-size:13px; }
+  .folder { margin-top:6px; }
+  body.popup { font-size:12px; background:#fff; }
+  body.popup .wrap { display:block; }
+  body.popup aside { border:0; padding:10px 12px 12px; gap:9px; min-height:100vh; }
+  body.popup h1 { font-size:14px; }
+  body.popup .step { font-size:10px; margin-bottom:4px; }
+  body.popup label.f { font-size:11px; margin-bottom:2px; }
+  body.popup input[type=text] { padding:5px 7px; }
+  body.popup .hint { font-size:11px; margin-top:4px; }
+  body.popup button { padding:5px 9px; font-size:12px; }
+  body.popup .btn-main, body.popup .btn-send { font-size:12.5px; padding:8px 6px; }
+  body.popup .chips span { padding:4px 2px; font-size:11.5px; }
+  body.popup ul#list li { padding:3px 6px; font-size:12px; } body.popup ul#list input.lb { padding:2px 4px; }
+  body.popup .status { font-size:11.5px; padding:6px 8px; min-height:0; }
+  body.popup #empty { padding:6px; font-size:11.5px; }
+  body.popup #mini img { max-height:200px; object-fit:contain; }
+  body.popup details { font-size:11.5px; } body.popup .grid2 { grid-template-columns:1fr 54px; }
+  body.popup main { display:none; }
+  body.popup.big .wrap { display:grid; grid-template-columns:330px 1fr; }
+  body.popup.big main { display:block; padding:14px 16px; }
   @media (max-width: 900px) { .wrap { grid-template-columns:1fr; } aside { border-right:0; border-bottom:1px solid var(--line); } .review { grid-template-columns:1fr; } }
 </style>
 </head>
 <body>
-<div id="clickhint"><div>👆 Cliquez n'importe où pour ouvrir la petite fenêtre au premier plan<small>Chrome demande un clic avant de pouvoir l'ouvrir</small></div></div>
+<div id="blockedhint"><div>Chrome a bloqué l'ouverture de la petite fenêtre.<br>Cliquez n'importe où pour l'ouvrir.
+  <small>Pour ne plus voir ce message : icône <b>⧉</b> (pop-up bloqué) à droite de la barre d'adresse › « Toujours autoriser les pop-ups »</small></div></div>
+<div id="openedhint"><div>✔ L'outil est ouvert dans sa petite fenêtre, en haut à droite.<small>Vous pouvez fermer cet onglet.</small></div></div>
 <div class="wrap">
 <aside id="aside">
-  <div class="top">
-    <h1>Superposeur d'audiogrammes<small>Capture · superposition · envoi Doctolib</small></h1>
-    <button id="btn-pip" class="pin" title="Ouvrir une petite fenêtre qui reste au-dessus de Doctolib">📌 Au premier plan</button>
-    <button id="btn-unpip" class="pin" title="Remettre dans l'onglet Chrome">↩ Onglet</button>
+  <h1>Audiogrammes superposés</h1>
+
+  <div>
+    <label class="f" for="patient">Patient</label>
+    <input id="patient" type="text" placeholder="lu automatiquement" autocomplete="off">
   </div>
 
   <div>
-    <label class="f" for="patient">Patient (titre et nom du fichier)</label>
-    <input id="patient" type="text" placeholder="NOM Prénom" autocomplete="off">
+    <div class="step">1 · Dossier des téléchargements</div>
+    <div class="watch"><span id="watch-dot" class="dot off"></span><span>Surveillé : <b id="watch-name">aucun</b></span>
+      <button id="btn-resume" hidden>▶ Reprendre</button><button id="btn-watch">Choisir le dossier…</button></div>
+    <p class="hint">Les PDF d'audiogramme qui y arrivent sont importés tout seuls. Ou glissez-les ici,
+      <label class="lnk">choisir des fichiers<input type="file" id="file" accept="application/pdf,.pdf" multiple hidden></label>.</p>
   </div>
 
   <div>
-    <div class="step">1 · Source</div>
-    <button id="btn-share" class="btn-wide">🖥  Choisir la fenêtre ou l'écran à lire</button>
-    <div class="src" id="src-on" hidden><video id="thumb" muted playsinline></video><span id="src-kind"></span></div>
-  </div>
-
-  <div>
-    <div class="step">2 · Capturer chaque audiogramme</div>
-    <button id="btn-capture" class="btn-main" disabled>📷  Capturer l'audiogramme affiché</button>
-    <label class="chk"><input type="checkbox" id="delay"> Retardateur 3 s (écran entier partagé)</label>
-    <p class="hint">ou glissez ici le <b>PDF de l'audiogramme</b> (page entière lue), collez une capture (<b>Ctrl+V</b>), ou
-      <label style="text-decoration:underline;cursor:pointer">choisissez des fichiers<input type="file" id="file" accept="image/*,application/pdf,.pdf" multiple hidden></label>.</p>
-  </div>
-
-  <div>
-    <div class="step">Audiogrammes importés <span style="text-transform:none;font-weight:400">(du plus ancien au plus récent)</span></div>
+    <div class="step">Audiogrammes <span class="sub">(du plus ancien au plus récent)</span></div>
     <ul id="list"></ul>
     <div id="empty">Aucun pour l'instant</div>
   </div>
 
   <div>
-    <div class="step">Courbes à afficher</div>
     <div class="chips">
       <label><input type="checkbox" id="show-air"><span>Aérienne</span></label>
       <label><input type="checkbox" id="show-bone"><span>Osseuse</span></label>
@@ -137,55 +161,37 @@
   </div>
 
   <div>
-    <div class="step">3 · Superposer et envoyer</div>
-    <button id="btn-sup" class="btn-main" disabled>Superposer (PDF)</button>
-    <div style="height:8px"></div>
-    <button id="btn-send" class="btn-send" disabled>Envoyer vers Doctolib</button>
-    <div class="folder" style="margin-top:6px"><span>Dossier Doctolib : <b id="folder">pas encore choisi</b></span><button id="btn-folder">Choisir…</button></div>
+    <div class="step">2 · Superposer et envoyer</div>
+    <div class="row2"><button id="btn-sup" class="btn-main" disabled>Superposer</button><button id="btn-send" class="btn-send" disabled>Envoyer vers Doctolib</button></div>
+    <div class="folder"><span>Doctolib : <b id="folder">pas encore choisi</b></span><button id="btn-folder">Choisir…</button></div>
   </div>
 
-  <div id="status" class="status">Commencez par choisir la fenêtre ou l'écran où s'affichent les audiogrammes.</div>
+  <div id="status" class="status">Choisissez le dossier où arrivent vos téléchargements d'audiogrammes.</div>
 
-  <div class="row" style="justify-content:space-between">
+  <div class="row" style="justify-content:space-between;align-items:center">
     <button id="btn-new">Nouveau patient</button>
+    <details>
+      <summary>Réglages</summary>
+      <div class="grid2">
+        <span>dB ligne du bas</span><input id="st-db_bottom" inputmode="decimal">
+        <span>dB entre lignes</span><input id="st-db_step" inputmode="decimal">
+      </div>
+      <label class="chk"><input type="checkbox" id="st-round"> Arrondir à 5 dB</label>
+      <button id="st-save" style="margin-top:6px">Enregistrer</button>
+    </details>
   </div>
-
-  <details>
-    <summary>Paramètres de lecture</summary>
-    <p class="hint">Les fréquences sont repérées automatiquement sur le quadrillage. Pour les dB :</p>
-    <div class="grid2">
-      <span>dB de la dernière ligne en bas</span><input id="st-db_bottom" inputmode="decimal">
-      <span>dB entre deux lignes</span><input id="st-db_step" inputmode="decimal">
-    </div>
-    <label class="chk"><input type="checkbox" id="st-round"> Arrondir au pas de 5 dB</label>
-    <label class="chk"><input type="checkbox" id="st-zoom"> Onglet Chrome partagé : dézoomer automatiquement si la page n'est pas entièrement visible</label>
-    <button id="st-save" style="margin-top:8px">Enregistrer</button>
-    <button id="st-diag" style="margin-top:8px">Enregistrer la dernière capture (diagnostic)</button>
-  </details>
 </aside>
 
 <main>
-  <video id="video" muted playsinline hidden></video>
-  <section id="pipnote" class="panel" style="margin-bottom:16px;background:#e6f4f1;border-color:#bfe3dc">
-    <b>La petite fenêtre est ouverte au premier plan.</b> Vous pouvez réduire cet onglet Chrome, mais ne le fermez pas :
-    la petite fenêtre en dépend. Les vérifications (✎) et le PDF s'affichent ici.
-  </section>
   <section id="p-help" class="panel help">
     <h2>Mode d'emploi</h2>
     <ol>
-      <li><b>Choisir la source</b> (une fois par séance) : de préférence la <b>fenêtre</b> du logiciel Doctolib ou d'audiométrie.
-        La capture marche même quand cet outil est devant.</li>
-      <li>Cliquez sur <b>📌 Au premier plan</b> : les commandes passent dans une petite fenêtre qui reste au-dessus de Doctolib.</li>
-      <li>Affichez un audiogramme, cliquez sur <b>Capturer</b> : il est lu et ajouté directement, sans validation. Le <b>nom, le prénom
-        et la date</b> de l'examen sont lus automatiquement sur l'en-tête. ✎ permet de vérifier ou corriger un examen à tout moment.</li>
-      <li>Si la page n'est pas visible en entier : capturez le haut, faites défiler, capturez le bas — les captures du même examen sont
-        <b>regroupées automatiquement</b>. Pour un onglet Chrome partagé, l'outil peut aussi dézoomer l'onglet tout seul le temps de la capture.</li>
-      <li>Cochez les courbes à afficher : <b>aérienne</b>, <b>osseuse</b>, <b>vocale</b> (une, deux ou les trois). L'aperçu se met à jour.</li>
-      <li><b>Envoyer vers Doctolib</b> crée le PDF et l'écrit dans le dossier d'import (passerelle) de Doctolib.</li>
+      <li><b>Une seule fois</b> : créez un dossier <b>Audiogrammes</b> dans Téléchargements et réglez Chrome (et Doctolib) pour y
+        télécharger, puis cliquez sur « Choisir le dossier… ». Chrome n'autorise pas une page web à surveiller Téléchargements lui-même.</li>
+      <li>Téléchargez les audiogrammes du patient : ils sont lus et ajoutés tout seuls (patient, date, aérienne, osseuse, vocale).</li>
+      <li>Cochez les courbes à afficher, puis <b>Envoyer vers Doctolib</b>.</li>
     </ol>
-    <div class="legendhint"><span><b class="od">Rouge</b> = oreille droite</span><span><b class="og">Bleu</b> = oreille gauche</span><span><b style="color:#2e7d32">Vert</b> = conduction osseuse</span></div>
-    <div class="tip">Rien ne quitte votre ordinateur : la lecture et le PDF se font dans Chrome.
-      La première fois, faites « Envoyer » depuis cet onglet pour que Chrome autorise le dossier Doctolib ; ensuite, la fenêtre flottante suffit.</div>
+    <div class="tip">Rien ne quitte votre ordinateur : la lecture et le PDF se font dans Chrome.</div>
   </section>
 
   <section id="p-review" class="panel" hidden>
@@ -237,6 +243,7 @@
       <button id="btn-open">Ouvrir le PDF</button>
       <button id="btn-dl" disabled>Télécharger</button>
     </div>
+    <div class="actions"><button id="btn-close-res">✕ Fermer</button></div>
     <div class="sent" id="res-sent" hidden><span>✔ Déposé dans le dossier d'import Doctolib.</span><button id="btn-new2">Patient suivant</button></div>
   </section>
 </main>
@@ -883,17 +890,16 @@ if (typeof module !== "undefined") module.exports = AG;
 
 </script>
 <script>
-/* Interface : capture d'écran (Chrome), import automatique, fenêtre flottante,
+/* Interface : import automatique des PDF téléchargés, petite fenêtre en haut à droite,
    affichage aérienne / osseuse / vocale, PDF superposé, envoi Doctolib. */
 (() => {
-  let pip = null;                                   // fenêtre flottante (Document PiP)
-  const $ = id => document.getElementById(id) || (pip && pip.document.getElementById(id));
+  const $ = id => document.getElementById(id);
   const EAR_NAME = { right: "Oreille droite", left: "Oreille gauche" };
   const EAR_COL = { right: "#c62828", left: "#1565c0" };
   const BONE = { right: "boneRight", left: "boneLeft" }, VOC = { right: "vocRight", left: "vocLeft" };
 
   // ------------------------------------------------------------ réglages
-  const S = { ...AG.DEFAULTS, show_air: true, show_bone: false, show_voc: false, tab_zoom: false };
+  const S = { ...AG.DEFAULTS, show_air: true, show_bone: false, show_voc: false };
   try { Object.assign(S, JSON.parse(localStorage.getItem("ag_settings") || "{}")); } catch (e) {}
   const saveS = () => { try { localStorage.setItem("ag_settings", JSON.stringify(S)); } catch (e) {} };
 
@@ -914,107 +920,29 @@ if (typeof module !== "undefined") module.exports = AG;
   const idbSet = (k, v) => idb("readwrite", st => st.put(v, k)).catch(() => null);
 
   // ------------------------------------------------------------ état
-  let stream = null, controller = null;
-  const video = document.getElementById("video");
   let items = [];       // {label, right, left, boneRight, boneLeft, vocRight, vocLeft, canvas, grids, vgrid}
   let current = null;   // audiogramme ouvert dans « Modifier » ou en encadrement manuel
   let pdf = null;
   let dirHandle = null;
 
   const status = (t, kind) => { const el = $("status"); el.textContent = t; el.className = "status " + (kind || ""); };
-  const show = id => { for (const p of ["p-help", "p-review", "p-manual", "p-result"]) document.getElementById(p).hidden = p !== id; };
+  const show = id => {
+    for (const p of ["p-help", "p-review", "p-manual", "p-result"]) document.getElementById(p).hidden = p !== id;
+    big(id !== "p-help");
+  };
   const nPts = o => Object.keys(o || {}).length;
 
-  // ------------------------------------------------------------ partage d'écran
-  async function shareScreen() {
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
-      status("Ce navigateur ne permet pas la capture d'écran. Utilisez Chrome, ou collez une capture (Ctrl+V).", "err");
-      return;
-    }
-    try {
-      controller = "CaptureController" in window ? new CaptureController() : null;
-      const opts = { video: { width: { ideal: 3840 }, height: { ideal: 2160 }, frameRate: { ideal: 5 } },
-        audio: false, selfBrowserSurface: "exclude", surfaceSwitching: "include" };
-      if (controller) opts.controller = controller;
-      stream = await navigator.mediaDevices.getDisplayMedia(opts);
-      if (controller && controller.setFocusBehavior) { try { controller.setFocusBehavior("no-focus-change"); } catch (e) {} }
-    } catch (e) {
-      stream = null;
-      status("Partage annulé.", "");
-      return updateSource();
-    }
-    video.srcObject = stream;
-    await video.play().catch(() => {});
-    OCR.load().catch(() => {});
-    const th = $("thumb"); th.srcObject = stream; th.play().catch(() => {});
-    const tr = stream.getVideoTracks()[0];
-    tr.addEventListener("ended", () => { stream = null; video.srcObject = null; $("thumb").srcObject = null; updateSource(); });
-    const surf = (tr.getSettings && tr.getSettings().displaySurface) || "";
-    $("delay").checked = surf === "monitor";
-    updateSource(surf);
-    status(surf === "monitor"
-      ? "Écran entier partagé : retardateur de 3 s activé pour laisser le temps d'afficher l'audiogramme."
-      : pip ? "Source partagée. Affichez un audiogramme puis cliquez sur Capturer." : "Source partagée. Cliquez sur 📌 pour garder cette fenêtre au premier plan, puis capturez.", "ok");
-  }
-
-  function updateSource(surf) {
-    const on = !!stream;
-    $("src-on").hidden = !on;
-    $("btn-share").textContent = on ? "Changer de source…" : "🖥  Choisir la fenêtre ou l'écran à lire";
-    $("btn-capture").disabled = !on;
-    const names = { monitor: "écran entier", window: "fenêtre", browser: "onglet Chrome" };
-    if (surf !== undefined) $("src-kind").textContent = on ? "Partagé : " + (names[surf] || "source choisie") : "";
-  }
-
-  async function grabFrame() {
-    if (!stream) throw new Error("aucune source partagée");
-    // ImageCapture lit l'image directement sur le flux : marche même si cet
-    // onglet est réduit ou en arrière-plan (fenêtre flottante seule visible)
-    if ("ImageCapture" in window) {
-      try {
-        const bmp = await new ImageCapture(stream.getVideoTracks()[0]).grabFrame();
-        const cv = document.createElement("canvas");
-        cv.width = bmp.width; cv.height = bmp.height;
-        cv.getContext("2d").drawImage(bmp, 0, 0);
-        bmp.close && bmp.close();
-        return cv;
-      } catch (e) { /* repli sur la vidéo */ }
-    }
-    if (video.readyState < 2) await new Promise(r => video.addEventListener("loadeddata", r, { once: true }));
-    await new Promise(r => setTimeout(r, 150));
-    const cv = document.createElement("canvas");
-    cv.width = video.videoWidth; cv.height = video.videoHeight;
-    cv.getContext("2d").drawImage(video, 0, 0);
-    return cv;
-  }
-
-  async function capture() {
-    $("btn-capture").disabled = true;
-    try {
-      if ($("delay").checked) {
-        for (let i = 3; i > 0; i--) { status(`Capture dans ${i} s… affichez l'audiogramme`, "busy"); await new Promise(r => setTimeout(r, 1000)); }
-      }
-      processCanvas(await grabFrame());
-    } catch (e) { status("Capture impossible : " + e.message, "err"); }
-    finally { $("btn-capture").disabled = !stream; }
-  }
-
-  async function importBlob(blob) {
-    if (blob.type === "application/pdf" || /\.pdf$/i.test(blob.name || "")) return importPdf(blob);
-    try {
-      const bmp = await createImageBitmap(blob);
-      const cv = document.createElement("canvas");
-      cv.width = bmp.width; cv.height = bmp.height;
-      cv.getContext("2d").drawImage(bmp, 0, 0);
-      processCanvas(cv);
-    } catch (e) { status("Image illisible.", "err"); }
+  // ------------------------------------------------------------ import des fichiers
+  function importFile(file, auto) {
+    if (file.type === "application/pdf" || /\.pdf$/i.test(file.name || "")) return importPdf(file, auto);
+    if (!auto) status("Seuls les PDF d'audiogramme sont acceptés.", "err");
   }
 
   // PDF de l'audiogramme : la page entière est lue, même ce qui ne tient pas à l'écran
   const PDFJS = Object.assign({ lib: "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs",
     worker: "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs" }, window.PDFJS_PATHS || {});
-  async function importPdf(file) {
-    status("Ouverture du PDF…", "busy");
+  async function importPdf(file, auto) {
+    status(`Lecture de ${file.name || "du PDF"}…`, "busy");
     try {
       const pdfjs = await import(PDFJS.lib);
       pdfjs.GlobalWorkerOptions.workerSrc = PDFJS.worker;
@@ -1027,19 +955,10 @@ if (typeof module !== "undefined") module.exports = AG;
         cv.width = Math.round(vp.width); cv.height = Math.round(vp.height);
         const ctx = cv.getContext("2d"); ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, cv.width, cv.height);
         await page.render({ canvasContext: ctx, viewport: vp }).promise;
-        await processCanvas(cv);
+        await processCanvas(cv, { fileName: file.name || "", auto });
       }
     } catch (e) { status("PDF illisible : " + e.message, "err"); }
   }
-  function saveLastFrame() {
-    if (!lastFrame) { status("Aucune capture pour l'instant.", "err"); return; }
-    lastFrame.toBlob(b => {
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(b); a.download = "derniere_capture_audiogramme.png";
-      document.body.appendChild(a); a.click(); a.remove();
-    }, "image/png");
-  }
-
   const prepCanvas = cv => AG.prep(cv.getContext("2d", { willReadFrequently: true }).getImageData(0, 0, cv.width, cv.height));
 
   // ------------------------------------------------------------ lecture automatique
@@ -1047,64 +966,33 @@ if (typeof module !== "undefined") module.exports = AG;
   const hasVoc = d => d && ((d.vocRight || []).length || (d.vocLeft || []).length);
   const tick = () => new Promise(r => setTimeout(r, 30));
 
-  // Onglet Chrome partagé : si une partie manque (page pas entièrement visible),
-  // on dézoome l'onglet le temps de la capture, puis on remet le zoom.
-  async function completeByZoom(res) {
-    const surf = stream && stream.getVideoTracks()[0].getSettings().displaySurface;
-    if (surf !== "browser" || !controller || !controller.decreaseZoomLevel || !S.tab_zoom) return res;
-    let air = hasAir(res.data) ? { data: res.data, canvas: res.canvas, grids: res.grids } : null;
-    let voc = hasVoc(res.data) ? { data: res.data, canvas: res.canvas, vgrid: res.vgrid } : null;
-    // la vocale est-elle peut-être coupée en bas de la page ?
-    const cut = air && Math.max(...Object.values(air.grids).map(g => g.y1)) > 0.55 * res.canvas.height;
-    if ((air && voc) || (air && !cut)) return res;
-    let steps = 0;
-    try {
-      while (steps < 3 && !(air && voc)) {
-        await controller.decreaseZoomLevel(); steps++;
-        status("Page partiellement visible : dézoom de l'onglet le temps de la lecture…", "busy");
-        await new Promise(r => setTimeout(r, 600));
-        const cv = await grabFrame();
-        const r2 = AG.analyse(prepCanvas(cv), S);
-        if (!air && hasAir(r2.data)) air = { data: r2.data, canvas: cv, grids: r2.grids };
-        if (!voc && hasVoc(r2.data)) voc = { data: r2.data, canvas: cv, vgrid: r2.vgrid };
-      }
-    } catch (e) { /* zoom refusé ou impossible : on garde la première lecture */ }
-    finally { for (let i = 0; i < steps; i++) { try { await controller.increaseZoomLevel(); } catch (e) { break; } } }
-    if (!steps) return res;
-    const data = { right: {}, left: {}, boneRight: {}, boneLeft: {}, vocRight: [], vocLeft: [] };
-    if (air) for (const k of ["right", "left", "boneRight", "boneLeft"]) data[k] = air.data[k];
-    if (voc) { data.vocRight = voc.data.vocRight; data.vocLeft = voc.data.vocLeft; }
-    return { data, grids: air ? air.grids : null, canvas: air ? air.canvas : res.canvas,
-      vgridV: voc ? voc.vgrid : null, vcanvas: voc ? voc.canvas : null };
-  }
-
   // Import direct, sans validation. Plusieurs captures du même examen (même
   // date lue, ou capture ne contenant que la vocale) sont fusionnées.
   // les captures sont traitées l'une après l'autre (clics rapprochés)
   let queue = Promise.resolve(), busy = 0;
-  function processCanvas(cv) {
+  function processCanvas(cv, meta) {
     busy++;
-    queue = queue.then(() => processOne(cv)).catch(e => status("Erreur de lecture : " + e.message, "err")).finally(() => { busy--; });
+    queue = queue.then(() => processOne(cv, meta || {})).catch(e => status("Erreur de lecture : " + e.message, "err")).finally(() => { busy--; });
     return queue;
   }
-  let lastFrame = null;
-  async function processOne(cv) {
-    lastFrame = cv;
+  async function processOne(cv, meta) {
     status("Lecture de l'audiogramme…", "busy");
     await tick();
-    let res = AG.analyse(prepCanvas(cv), S);
+    const res = AG.analyse(prepCanvas(cv), S);
     res.canvas = cv;
-    res = await completeByZoom(res);
     const data = res.data || { right: {}, left: {}, boneRight: {}, boneLeft: {}, vocRight: [], vocLeft: [] };
     if (!hasAir(data) && !hasVoc(data)) {
+      if (meta.auto) { status(`${meta.fileName} : pas d'audiogramme reconnu, ignoré.`, ""); return; }
       current = { canvas: cv, P: null, grids: null, data: null, vgrid: null, label: `Examen ${items.length + 1}`, editIndex: -1 };
       openManual("Je n'ai pas trouvé d'audiogramme lisible. Encadrez la grille à la souris.");
-      if (pip) { status("Audiogramme non trouvé : encadrez-le dans l'onglet principal.", "err"); window.focus(); }
       return;
     }
-    status("Lecture du nom et de la date…", "busy");
-    let info = {};
-    try { info = await OCR.read(res.canvas || cv, res.grids); } catch (e) { info = {}; }
+    // nom et date : d'abord dans le nom du fichier (NOM_PRENOM_Audiogramme_AAAA-MM-JJ.pdf), sinon lus sur la page
+    let info = OCR.parse((meta.fileName || "").replace(/\.pdf$/i, ""));
+    if (!info.name || !info.date) {
+      status("Lecture du nom et de la date…", "busy");
+      try { const o = await OCR.read(res.canvas || cv, res.grids); info = { name: info.name || o.name, date: info.date || o.date }; } catch (e) {}
+    }
     place({ ...data, canvas: res.canvas || cv, grids: res.grids, vgrid: res.vgridV || res.vgrid, vcanvas: res.vcanvas || res.canvas || cv }, info);
   }
 
@@ -1117,7 +1005,9 @@ if (typeof module !== "undefined") module.exports = AG;
       const surname = s => normName((s || "").split(/\s+/).filter(w => w === w.toUpperCase()).join(" ") || s);
       if (!cur) $("patient").value = info.name;
       else if (surname(cur) !== surname(info.name)) {
-        if (items.length) warn = ` ⚠ Patient lu : ${info.name}, différent de « ${cur} » — vérifiez qu'il s'agit du même patient !`;
+        // autre patient : on repart d'une liste vide pour ne jamais mélanger deux patients
+        if (items.length) { resetPatient(); warn = ` Nouveau patient : ${info.name} (liste de « ${cur} » fermée).`; }
+        $("patient").value = info.name;
       } else if (info.name.length > cur.length && normName(info.name).startsWith(normName(cur))) $("patient").value = info.name;
     }
     // examen visé : celui de la même date, sinon le dernier importé
@@ -1135,7 +1025,7 @@ if (typeof module !== "undefined") module.exports = AG;
       if (!last.date && info.date) { last.date = info.date; if (/^Examen \d+$/.test(last.label)) last.label = info.date; }
       invalidate(); sortItems(); renderList(); refreshPreview();
       status((added.length ? `✔ ${last.label} complété (${added.map(k => k === "vocale" ? "vocale" : k.startsWith("bone") ? "osseuse" : "aérienne").join(", ")}).`
-        : `${last.label} : rien de nouveau dans cette capture.`) + warn, warn ? "err" : "ok");
+        : `${last.label} : déjà importé.`) + warn, "ok");
       return;
     }
     it.date = info.date || null;
@@ -1159,7 +1049,7 @@ if (typeof module !== "undefined") module.exports = AG;
     if (nPts(it.boneRight) || nPts(it.boneLeft)) parts.push(`osseuse ${nPts(it.boneRight)}·${nPts(it.boneLeft)}`);
     if (it.vocRight.length || it.vocLeft.length) parts.push(`vocale ${it.vocRight.length}·${it.vocLeft.length}`);
     const tip = it.date ? "" : " Date non lue : tapez-la dans la liste.";
-    status(`✔ ${it.label} importé (${parts.join(", ")} points OD·OG).${tip}` + (warn || ""), warn ? "err" : "ok");
+    status(`✔ ${it.label} importé (${parts.join(", ")} points OD·OG).${tip}` + (warn || ""), "ok");
     if (!it.date) {
       const idx = items.indexOf(it);
       const inp = $("list").querySelectorAll("input.lb")[idx];
@@ -1422,6 +1312,7 @@ if (typeof module !== "undefined") module.exports = AG;
     });
     $("empty").hidden = items.length > 0;
     $("btn-sup").disabled = !items.length;
+    $("btn-send").disabled = !items.length;
   }
   function listAction(a, i) {
     if (a === "up" && i > 0) [items[i - 1], items[i]] = [items[i], items[i - 1]];
@@ -1434,7 +1325,6 @@ if (typeof module !== "undefined") module.exports = AG;
         data: { right: { ...it.right }, left: { ...it.left }, boneRight: { ...it.boneRight }, boneLeft: { ...it.boneLeft },
           vocRight: [...it.vocRight], vocLeft: [...it.vocLeft] } };
       if (it.grids || it.vgrid) showReview(); else openManual();
-      if (pip) { status("Vérification ouverte dans l'onglet principal.", "ok"); window.focus(); }
       return;
     } else return;
     invalidate(); renderList(); refreshPreview();
@@ -1442,7 +1332,7 @@ if (typeof module !== "undefined") module.exports = AG;
   function invalidate() {
     if (pdf && pdf.url) URL.revokeObjectURL(pdf.url);
     pdf = null;
-    $("btn-send").disabled = true;
+    $("btn-send").disabled = !items.length;
     document.getElementById("btn-dl").disabled = true;
   }
 
@@ -1711,7 +1601,7 @@ if (typeof module !== "undefined") module.exports = AG;
 
   const safeName = t => t.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "_");
 
-  async function superpose() {
+  async function superpose(showIt = true) {
     if (!items.length) return;
     status("Création du PDF…", "busy");
     const patient = $("patient").value.trim();
@@ -1726,7 +1616,7 @@ if (typeof module !== "undefined") module.exports = AG;
     document.getElementById("res-img").src = canvas.toDataURL("image/jpeg", 0.85);
     document.getElementById("res-name").textContent = name;
     document.getElementById("res-sent").hidden = true;
-    show("p-result");
+    if (showIt !== false) show("p-result");
     $("btn-send").disabled = false;
     document.getElementById("btn-dl").disabled = false;
     status("PDF prêt. Cliquez sur Envoyer vers Doctolib.", "ok");
@@ -1739,10 +1629,9 @@ if (typeof module !== "undefined") module.exports = AG;
   }
 
   async function chooseFolder() {
-    const w = pip || window;
-    if (!w.showDirectoryPicker) { status("Ce navigateur ne permet pas d'écrire dans un dossier : utilisez Télécharger.", "err"); return null; }
+    if (!window.showDirectoryPicker) { status("Ce navigateur ne permet pas d'écrire dans un dossier : utilisez Télécharger.", "err"); return null; }
     try {
-      dirHandle = await w.showDirectoryPicker({ id: "doctolib", mode: "readwrite" });
+      dirHandle = await window.showDirectoryPicker({ id: "doctolib", mode: "readwrite" });
       await idbSet("dir", dirHandle);
       showFolder();
       return dirHandle;
@@ -1751,7 +1640,7 @@ if (typeof module !== "undefined") module.exports = AG;
   function showFolder() { $("folder").textContent = dirHandle ? dirHandle.name || "choisi" : "pas encore choisi"; }
 
   async function send() {
-    if (!pdf) await superpose();
+    if (!pdf) await superpose(false);
     if (!pdf) return;
     if (!window.showDirectoryPicker) { download(); status("PDF téléchargé : glissez-le dans le dossier d'import Doctolib.", "ok"); return; }
     const h = dirHandle || await chooseFolder();
@@ -1764,83 +1653,132 @@ if (typeof module !== "undefined") module.exports = AG;
       const w = await fh.createWritable();
       await w.write(pdf.blob); await w.close();
     } catch (e) {
-      status(pip ? "Chrome demande d'autoriser le dossier : cliquez une fois sur Envoyer dans l'onglet principal (↩), ensuite ça marchera ici."
-        : "Envoi impossible : " + e.message, "err");
+      status("Envoi impossible : " + e.message, "err");
       return;
     }
     status(`✔ Envoyé dans le dossier Doctolib « ${h.name} » : ${pdf.name}`, "ok");
     document.getElementById("res-sent").hidden = false;
   }
 
+  function resetPatient() {
+    items = []; lastAdded = null; $("patient").value = ""; invalidate(); renderList(); refreshPreview(); show("p-help");
+  }
   function newPatient() {
-    const w = pip || window;
-    if (items.length && !window.__noConfirm && !w.confirm("Effacer la liste et passer au patient suivant ?")) return;
-    items = []; $("patient").value = ""; invalidate(); renderList(); refreshPreview(); show("p-help");
-    status("Nouveau patient : affichez le premier audiogramme puis cliquez sur Capturer.", "");
+    if (items.length && !window.__noConfirm && !confirm("Effacer la liste et passer au patient suivant ?")) return;
+    resetPatient();
+    status("Nouveau patient : téléchargez ses audiogrammes.", "");
   }
 
-  // ------------------------------------------------------------ fenêtre flottante
-  async function openPip(silent) {
-    if (pip) return true;
-    if (!("documentPictureInPicture" in window)) {
-      if (!silent) status("Cette version de Chrome ne propose pas la fenêtre flottante (Chrome 116 ou plus récent requis).", "err");
-      return false;
-    }
+  // ------------------------------------------------------------ dossier surveillé
+  // Chrome interdit de surveiller « Téléchargements » lui-même : on surveille un
+  // sous-dossier (p. ex. Téléchargements\Audiogrammes) où arrivent les PDF.
+  let watchHandle = null, watchTimer = null, seen = new Set(), startTime = Date.now();
+  const fileKey = f => `${f.name}|${f.size}|${f.lastModified}`;
+  function showWatch(state) {
+    $("watch-name").textContent = watchHandle ? watchHandle.name : "aucun";
+    $("watch-dot").className = "dot " + (state || "off");
+    $("btn-resume").hidden = state !== "paused";
+    $("btn-watch").textContent = watchHandle ? "Changer…" : "Choisir le dossier…";
+  }
+  async function chooseWatch() {
     try {
-      pip = await documentPictureInPicture.requestWindow({ width: 370, height: 720 });
-    } catch (e) { if (!silent) status("Fenêtre flottante refusée : " + e.message, "err"); pip = null; return false; }
-    document.body.classList.remove("need-click");
-    for (const st of document.querySelectorAll("style")) pip.document.head.appendChild(st.cloneNode(true));
-    pip.document.title = "Audiogrammes";
-    pip.document.body.classList.add("pip");
-    const aside = document.getElementById("aside");
-    pip.document.body.appendChild(aside);
-    document.body.classList.add("pip-open");
-    const th = $("thumb"); if (stream) { th.srcObject = stream; th.play().catch(() => {}); }
-    pip.document.addEventListener("paste", onPaste);
-    pip.document.addEventListener("dragover", e => e.preventDefault());
-    pip.document.addEventListener("drop", onDrop);
-    pip.addEventListener("pagehide", () => {
-      const a = pip.document.getElementById("aside");
-      document.querySelector(".wrap").prepend(a);
-      pip = null;
-      document.body.classList.remove("pip-open");
-      const t = document.getElementById("thumb"); if (stream) { t.srcObject = stream; t.play().catch(() => {}); }
-    });
-    status(stream ? "Fenêtre flottante ouverte : elle reste au-dessus de Doctolib." : "Choisissez maintenant la fenêtre Doctolib à lire.", "ok");
-    return true;
+      watchHandle = await window.showDirectoryPicker({ id: "audios", mode: "read", startIn: "downloads" });
+    } catch (e) { return; }
+    await idbSet("watch", watchHandle);
+    seen = new Set(); await idbSet("seen", []);
+    startTime = Date.now();
+    await startWatch();
+  }
+  async function restoreWatch() {
+    const h = await idbGet("watch");
+    seen = new Set((await idbGet("seen")) || []);
+    if (!h) { showWatch("off"); return; }
+    watchHandle = h;
+    const perm = await h.queryPermission({ mode: "read" }).catch(() => "denied");
+    if (perm === "granted") startWatch();
+    else { showWatch("paused"); status("Cliquez sur ▶ Reprendre pour surveiller à nouveau le dossier des audiogrammes.", "busy"); }
+  }
+  async function resumeWatch() {
+    if (!watchHandle) return chooseWatch();
+    const perm = await watchHandle.requestPermission({ mode: "read" }).catch(() => "denied");
+    if (perm === "granted") startWatch(); else status("Chrome n'a pas reçu l'autorisation de lire le dossier.", "err");
+  }
+  async function startWatch() {
+    clearInterval(watchTimer);
+    showWatch("on");
+    await scan(true);
+    watchTimer = setInterval(() => scan(false), 2000);
+    status(`Surveillance du dossier « ${watchHandle.name} » : les audiogrammes téléchargés y seront importés tout seuls.`, "ok");
+  }
+  let scanning = false;
+  async function scan(first) {
+    if (!watchHandle || scanning) return;
+    scanning = true;
+    try {
+      const fresh = [];
+      for await (const [name, h] of watchHandle.entries()) {
+        if (h.kind !== "file" || !/\.pdf$/i.test(name)) continue;
+        const f = await h.getFile();
+        const key = fileKey(f);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        // au démarrage, on ne reprend que les PDF de moins de 30 minutes
+        if (first && f.lastModified < startTime - 30 * 60 * 1000) continue;
+        fresh.push(f);
+      }
+      if (fresh.length) {
+        await idbSet("seen", [...seen].slice(-2000));
+        fresh.sort((a, b) => a.lastModified - b.lastModified);
+        for (const f of fresh) await importFile(f, true);
+      }
+    } catch (e) {
+      clearInterval(watchTimer); showWatch("paused");
+      status("Surveillance interrompue (autorisation perdue) : cliquez sur ▶ Reprendre.", "err");
+    } finally { scanning = false; }
   }
 
-  // Ouverture directe en petite fenêtre au premier plan. Chrome n'autorise
-  // l'ouverture qu'après un geste de l'utilisateur : si l'essai automatique
-  // est refusé, le premier clic n'importe où sur la page l'ouvre.
-  async function autoPip() {
-    if (await openPip(true)) return;
-    if (!("documentPictureInPicture" in window)) return;
-    document.body.classList.add("need-click");
-    const once = async e => {
-      if (pip) return;
-      if (e.target && e.target.closest && e.target.closest("#btn-unpip")) return;
+  // ------------------------------------------------------------ petite fenêtre en haut à droite
+  const SMALL = { w: 330, h: Math.min(860, screen.availHeight || 860) };
+  const isPopup = window.name === "audiogrammes";
+  function placeWin(w, h) {
+    try { window.resizeTo(w, h); window.moveTo((screen.availLeft || 0) + screen.availWidth - w, screen.availTop || 0); } catch (e) {}
+  }
+  function big(on) {
+    if (!isPopup) return;
+    document.body.classList.toggle("big", on);
+    if (on) placeWin(Math.min(1180, screen.availWidth), Math.min(900, screen.availHeight));
+    else placeWin(SMALL.w, SMALL.h);
+  }
+  function openSmallWindow() {
+    const left = (screen.availLeft || 0) + screen.availWidth - SMALL.w, top = screen.availTop || 0;
+    return window.open(location.href.split("#")[0], "audiogrammes",
+      `popup=yes,width=${SMALL.w},height=${SMALL.h},left=${left},top=${top}`);
+  }
+  function setupWindow() {
+    if (isPopup) { document.body.classList.add("popup"); placeWin(SMALL.w, SMALL.h); return; }
+    if (window.__noPopup) return;
+    const w = openSmallWindow();
+    if (w) { document.body.classList.add("opened"); try { window.close(); } catch (e) {} return; }
+    // fenêtre bloquée : Chrome ne l'autorise qu'après un clic, ou si les pop-ups sont permis pour ce site
+    document.body.classList.add("blocked");
+    const once = () => {
       document.removeEventListener("pointerdown", once, true);
-      document.removeEventListener("keydown", once, true);
-      if (!(await openPip())) document.body.classList.remove("need-click");
+      if (openSmallWindow()) { document.body.classList.remove("blocked"); document.body.classList.add("opened"); try { window.close(); } catch (e) {} }
     };
     document.addEventListener("pointerdown", once, true);
-    document.addEventListener("keydown", once, true);
   }
-  function closePip() { if (pip) pip.close(); }
 
   // ------------------------------------------------------------ paramètres
   function syncSettingsForm() {
     for (const k of ["db_bottom", "db_step"]) $("st-" + k).value = S[k];
-    $("st-round").checked = !!S.round_5; $("st-zoom").checked = !!S.tab_zoom;
+    $("st-round").checked = !!S.round_5;
     $("show-air").checked = !!S.show_air; $("show-bone").checked = !!S.show_bone; $("show-voc").checked = !!S.show_voc;
   }
   function saveSettingsForm() {
     for (const k of ["db_bottom", "db_step"]) {
       const v = parseFloat($("st-" + k).value.replace(",", ".")); if (!isNaN(v)) S[k] = v;
     }
-    S.round_5 = $("st-round").checked; S.tab_zoom = $("st-zoom").checked; saveS();
+    S.round_5 = $("st-round").checked; saveS();
     status("Paramètres enregistrés.", "ok");
   }
   function onShowChange() {
@@ -1848,28 +1786,22 @@ if (typeof module !== "undefined") module.exports = AG;
     saveS(); invalidate(); refreshPreview();
     if (!document.getElementById("p-result").hidden && items.length) superpose();
   }
-  function onPaste(e) {
-    for (const it of e.clipboardData.items) if (it.type.startsWith("image/")) { importBlob(it.getAsFile()); e.preventDefault(); return; }
-  }
-
   // ------------------------------------------------------------ branchements
-  $("btn-share").onclick = shareScreen;
-  $("btn-capture").onclick = capture;
-  $("btn-sup").onclick = superpose;
+  $("btn-sup").onclick = () => superpose();
   $("btn-send").onclick = send;
   $("btn-folder").onclick = chooseFolder;
   $("btn-new").onclick = newPatient;
-  $("btn-pip").onclick = () => openPip();
-  $("btn-unpip").onclick = closePip;
+  $("btn-watch").onclick = chooseWatch;
+  $("btn-resume").onclick = resumeWatch;
   $("st-save").onclick = saveSettingsForm;
   for (const id of ["show-air", "show-bone", "show-voc"]) $(id).onchange = onShowChange;
   $("patient").oninput = () => { invalidate(); schedulePreview(); };
-  $("mini-img").onclick = () => { superpose(); if (pip) window.focus(); };
-  $("file").onchange = async e => { const fs = [...e.target.files]; e.target.value = ""; for (const f of fs) await importBlob(f); };
-  $("st-diag").onclick = saveLastFrame;
+  $("mini-img").onclick = () => superpose();
+  $("file").onchange = async e => { const fs = [...e.target.files]; e.target.value = ""; for (const f of fs) await importFile(f); };
   const g = id => document.getElementById(id);
   g("btn-dl").onclick = download;
   g("btn-open").onclick = () => pdf && window.open(pdf.url, "_blank");
+  g("btn-close-res").onclick = () => { show("p-help"); };
   g("btn-new2").onclick = newPatient;
   g("rv-ok").onclick = saveReview;
   g("rv-cancel").onclick = () => { current = null; show("p-help"); status("Annulé.", ""); };
@@ -1880,20 +1812,20 @@ if (typeof module !== "undefined") module.exports = AG;
   mn.onmousedown = e => { const [x, y] = mpos(e); drag = { x0: x, y0: y, x1: null, y1: null }; };
   mn.onmousemove = e => { if (!drag) return; [drag.x1, drag.y1] = mpos(e); redrawManual(); };
   window.addEventListener("mouseup", () => { if (drag && drag.x1 != null) manualDone(); else drag = null; });
-  document.addEventListener("paste", onPaste);
   document.addEventListener("dragover", e => e.preventDefault());
   document.addEventListener("drop", onDrop);
   function onDrop(e) {
     e.preventDefault();
-    for (const f of [...e.dataTransfer.files].filter(f => f.type.startsWith("image/") || f.type === "application/pdf" || /\.pdf$/i.test(f.name)))
-      importBlob(f);
+    for (const f of [...e.dataTransfer.files].filter(f => f.type === "application/pdf" || /\.pdf$/i.test(f.name)))
+      importFile(f);
   }
 
   idbGet("dir").then(h => { if (h) dirHandle = h; showFolder(); });
-  syncSettingsForm(); renderList(); updateSource(""); show("p-help");
-  autoPip();
-  window.__app = { get busy() { return busy; }, OCR, importBlob, superpose, send, openPip, get items() { return items; }, get pdf() { return pdf; },
-    get pip() { return pip; }, setDir(h) { dirHandle = h; showFolder(); }, processCanvas };
+  syncSettingsForm(); renderList(); show("p-help");
+  setupWindow();
+  restoreWatch();
+  window.__app = { get busy() { return busy; }, OCR, importFile, superpose, send, get items() { return items; }, get pdf() { return pdf; },
+    setDir(h) { dirHandle = h; showFolder(); }, setWatch(h) { watchHandle = h; return startWatch(); }, scan: () => scan(), processCanvas };
 })();
 
 </script>
