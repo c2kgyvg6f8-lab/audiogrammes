@@ -1382,10 +1382,17 @@ if (typeof module !== "undefined") module.exports = AG;
   }
 
   // ------------------------------------------------------------ dessin des graphiques
-  function shade(ear, t) {
-    const a = ear === "right" ? [252, 146, 114] : [158, 202, 225];
-    const b = ear === "right" ? [103, 0, 13] : [8, 48, 107];
-    return `rgb(${a.map((v, i) => Math.round(v + (b[i] - v) * t)).join(",")})`;
+  // Couleur d'un examen (i : rang chronologique, 0 = le plus ancien, n examens).
+  // Le plus récent : rouge vif (OD) / bleu vif (OG). Les précédents, du plus
+  // récent au plus ancien : du rose au rouge très foncé (OD), du bleu pâle au
+  // bleu-noir (OG).
+  function examColor(ear, i, n) {
+    if (i === n - 1) return ear === "right" ? "rgb(230,0,0)" : "rgb(0,72,255)";
+    const older = n - 1, r = n - 2 - i;               // r = 0 : examen précédent le plus récent
+    const t = older > 1 ? r / (older - 1) : 0;
+    const a = ear === "right" ? [244, 143, 177] : [144, 202, 249];   // rose / bleu pâle
+    const b = ear === "right" ? [90, 0, 0] : [8, 18, 48];             // rouge très foncé / bleu-noir
+    return `rgb(${a.map((v, j) => Math.round(v + (b[j] - v) * t)).join(",")})`;
   }
   const flabel = f => (f >= 1000 ? `${f / 1000}k` : `${f}`);
   const round1 = v => { const x = v * 10, f = Math.floor(x), d = x - f;
@@ -1455,7 +1462,7 @@ if (typeof module !== "undefined") module.exports = AG;
     const n = list.length, legend = [];
     const both = opts.air && opts.bone;
     list.forEach((a, i) => {
-      const col = shade(ear, n > 1 ? i / (n - 1) : 1);
+      const col = examColor(ear, i, n);
       const series = [];
       // aérienne : toujours en trait plein ; osseuse : toujours en pointillés,
       // de la même couleur que l'aérienne du même examen
@@ -1496,7 +1503,7 @@ if (typeof module !== "undefined") module.exports = AG;
       for (const ear of AG.EARS) {
         const pts = a[VOC[ear]] || [];
         if (!pts.length) continue;
-        const col = shade(ear, n > 1 ? i / (n - 1) : 1), dash = [], mk = ear === "right" ? "O" : "X";
+        const col = examColor(ear, i, n), dash = [], mk = ear === "right" ? "O" : "X";
         c.save();
         c.strokeStyle = col; c.lineWidth = 1.6 * k; c.setLineDash(dash.map(d => d * k));
         c.beginPath(); pts.forEach(([d, p], j) => (j ? c.lineTo : c.moveTo).call(c, PX(d), PY(p))); c.stroke();
@@ -1582,7 +1589,7 @@ if (typeof module !== "undefined") module.exports = AG;
     c.fillText(`${JOURS[now.getDay()]} ${now.getDate()} ${MOIS_L[now.getMonth()]} ${now.getFullYear()}`, 17 * k, 82 * k);
     font(c, k, 7.5); c.fillStyle = "#555";
     const shown = [opts.air && "aérienne", opts.bone && "osseuse", opts.voc && "vocale"].filter(Boolean).join(", ") || "aucune courbe";
-    c.fillText(`Bilan audiométrique comparatif — examens du ${list.map(a => a.label).join(", ")} (du plus clair au plus foncé)`, 18 * k, 96 * k, 560 * k);
+    c.fillText(`Bilan audiométrique comparatif — examens du ${list.map(a => a.label).join(", ")} (le plus récent en rouge et bleu vifs)`, 18 * k, 96 * k, 560 * k);
 
     // --- tableau des seuils
     const rows = [];
