@@ -116,12 +116,10 @@
 
   <details>
     <summary>Paramètres de lecture</summary>
-    <p class="hint">Graduations des bords de la grille de vos audiogrammes :</p>
+    <p class="hint">Les fréquences sont repérées automatiquement sur le quadrillage. Pour les dB :</p>
     <div class="grid2">
-      <span>Fréquence bord gauche (Hz)</span><input id="st-f_min" inputmode="decimal">
-      <span>Fréquence bord droit (Hz)</span><input id="st-f_max" inputmode="decimal">
-      <span>dB bord haut</span><input id="st-db_min" inputmode="decimal">
-      <span>dB bord bas</span><input id="st-db_max" inputmode="decimal">
+      <span>dB de la dernière ligne en bas</span><input id="st-db_bottom" inputmode="decimal">
+      <span>dB entre deux lignes</span><input id="st-db_step" inputmode="decimal">
     </div>
     <label class="chk"><input type="checkbox" id="st-round"> Arrondir au pas de 5 dB</label>
     <button id="st-save" style="margin-top:8px">Enregistrer</button>
@@ -160,14 +158,12 @@
         <table id="rv-table"></table>
         <p class="hint">Case vide = fréquence non mesurée.</p>
         <div class="axes">
-          <b>Graduations des bords de la grille</b>
+          <b>Si tous les points sont décalés en hauteur</b>
           <div class="grid2">
-            <span>Hz bord gauche</span><input id="ax-f_min" inputmode="decimal">
-            <span>Hz bord droit</span><input id="ax-f_max" inputmode="decimal">
-            <span>dB bord haut</span><input id="ax-db_min" inputmode="decimal">
-            <span>dB bord bas</span><input id="ax-db_max" inputmode="decimal">
+            <span>dB de la dernière ligne en bas</span><input id="ax-db_bottom" inputmode="decimal">
+            <span>dB entre deux lignes</span><input id="ax-db_step" inputmode="decimal">
           </div>
-          <button id="rv-reread" style="margin-top:8px;width:100%">Relire avec ces graduations</button>
+          <button id="rv-reread" style="margin-top:8px;width:100%">Relire</button>
         </div>
         <div class="actions">
           <button id="rv-ok" class="ok">✔ Valider</button>
@@ -203,7 +199,7 @@ const AG = (() => {
   const STD = [125, 250, 500, 750, 1000, 1500, 2000, 3000, 4000, 6000, 8000];
   const OCT = new Set([125, 250, 500, 1000, 2000, 4000, 8000]);
   const EARS = ["right", "left"];
-  const DEFAULTS = { f_min: 125, f_max: 8000, db_min: -10, db_max: 120, round_5: true };
+  const DEFAULTS = { f_min: 125, f_max: 8000, db_min: -10, db_max: 120, db_bottom: 120, db_step: 10, round_5: true };
 
   // ---------------------------------------------------------------- pixels
   function prep(imgData) {
@@ -227,6 +223,34 @@ const AG = (() => {
       h /= 2;
       if ((h <= 10 || h >= 168) && s >= 90 && mx >= 70) red[i] = 1;
       else if (h >= 95 && h <= 135) blue[i] = 1;
+    }
+    // Lissage « ClearType » : le texte noir est dessiné avec des liserés
+    // colorés (bleu à côté d'orange, rouge à côté de cyan). Un vrai symbole
+    // n'a pas ces couleurs complémentaires juste à côté de lui.
+    const hue = new Uint8Array(n), sat = new Uint8Array(n), dark = new Uint8Array(n);
+    for (let i = 0, p = 0; i < n; i++, p += 4) {
+      const r = data[p], g = data[p + 1], b = data[p + 2];
+      const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+      dark[i] = mx < 120 && (mx === 0 || d / mx < 0.5) ? 1 : 0;
+      if (!d || !mx) { hue[i] = 255; continue; }
+      let h = mx === r ? 60 * ((g - b) / d) : mx === g ? 60 * ((b - r) / d + 2) : 60 * ((r - g) / d + 4);
+      if (h < 0) h += 360;
+      hue[i] = (h / 2) | 0; sat[i] = (255 * d / mx) | 0;
+    }
+    const warm = i => sat[i] >= 60 && hue[i] !== 255 && ((hue[i] >= 5 && hue[i] <= 35) || (hue[i] >= 145 && hue[i] <= 167));
+    const cyan = i => sat[i] >= 35 && hue[i] >= 80 && hue[i] <= 108;
+    for (let y = 0; y < H; y++) {
+      const row = y * W;
+      for (let x = 0; x < W; x++) {
+        const i = row + x;
+        if (!red[i] && !blue[i]) continue;
+        for (let dx = -2; dx <= 2; dx++) {
+          const xx = x + dx;
+          if (!dx || xx < 0 || xx >= W) continue;
+          const j = row + xx;
+          if (dark[j] || (blue[i] && warm(j)) || (red[i] && cyan(j))) { red[i] = 0; blue[i] = 0; break; }
+        }
+      }
     }
     return { W, H, gray, red, blue };
   }
@@ -396,25 +420,124 @@ const AG = (() => {
         vl: vl.map(v => v + c.x), hl: hl.map(v => v + c.y) };
       colorStats(P, g);
       const colour = g.red + g.blue;
-      if (colour < 0.0015) continue;
+      if (colour < 0.0004) continue;
+      calibrate(g);
       const reg = 0.5 * (regular(hl) + regular(vl));
-      g.score = vl.length * hl.length * (0.3 + reg) * (1 + 50 * Math.min(colour, 0.05)) * Math.sqrt(c.w * c.h);
+      g.score = vl.length * hl.length * (0.3 + reg) * (1 + 50 * Math.min(colour, 0.05)) * Math.sqrt(c.w * c.h)
+        * (g.valid ? 3 : 1);
       cands.push(g);
     }
     cands.sort((a, b) => b.score - a.score);
     return cands;
   }
 
+  // ---------------------------------------------------- étalonnage des axes
+  // Repère quelle ligne verticale correspond à quelle fréquence (échelle log),
+  // et le pas régulier des lignes horizontales (en général 10 dB).
+  function calibrateX(g) {
+    const vl = g.vl, w = g.x1 - g.x0, L = STD.map(f => Math.log2(f));
+    let best = null;
+    for (let i = 0; i < vl.length; i++) for (let j = i + 1; j < vl.length; j++)
+      for (let p = 0; p < STD.length; p++) for (let q = p + 1; q < STD.length; q++) {
+        const b = (vl[j] - vl[i]) / (L[q] - L[p]);
+        if (b < 0.06 * w || b > 1.2 * w) continue;
+        const a = vl[i] - b * L[p], tol = Math.max(1.5, 0.05 * b);
+        const used = new Set(), pairs = [];
+        for (let k = 0; k < STD.length; k++) {
+          const x = a + b * L[k];
+          if (x < g.x0 - tol || x > g.x1 + tol) continue;
+          let bi = -1, bd = 1e9;
+          for (let t = 0; t < vl.length; t++) { const dd = Math.abs(vl[t] - x); if (dd < bd) { bd = dd; bi = t; } }
+          if (bd <= tol && !used.has(bi)) { used.add(bi); pairs.push([L[k], vl[bi], STD[k]]); }
+        }
+        const m = pairs.length;
+        if (m < 3) continue;
+        let inner = 0;
+        vl.forEach((v, t) => { if (!((t === 0 || t === vl.length - 1) && !used.has(t))) inner++; });
+        const expl = used.size / Math.max(1, inner);
+        const fs = pairs.map(p => p[2]);
+        const score = m + 2 * expl + (fs.includes(8000) ? 0.6 : 0) + (fs.includes(125) ? 0.3 : 0);
+        if (!best || score > best.score) best = { score, pairs, m, expl };
+      }
+    if (!best) return null;
+    // ajustement par moindres carrés
+    const n = best.pairs.length;
+    const mx = best.pairs.reduce((s, p) => s + p[0], 0) / n, my = best.pairs.reduce((s, p) => s + p[1], 0) / n;
+    let sxy = 0, sxx = 0;
+    for (const [u, v] of best.pairs) { sxy += (u - mx) * (v - my); sxx += (u - mx) ** 2; }
+    const b = sxy / sxx, a = my - b * mx;
+    return { a, b, m: best.m, expl: best.expl, freqs: best.pairs.map(p => p[2]).sort((u, v) => u - v) };
+  }
+
+  function calibrateY(hl) {
+    if (hl.length < 4) return null;
+    const diffs = [];
+    for (let i = 1; i < hl.length; i++) diffs.push(hl[i] - hl[i - 1]);
+    const ds = [...diffs].sort((u, v) => u - v), d0 = ds[ds.length >> 1];
+    if (d0 < 3) return null;
+    // chaîne de lignes régulièrement espacées (tolère les arrondis de pixels)
+    let best = null;
+    for (const anchor of hl) {
+      const mem = [anchor];
+      for (const dir of [1, -1]) {
+        let last = anchor, d = d0, steps = 0;
+        for (;;) {
+          const exp = last + dir * d;
+          let hit = null, bd = 1e9;
+          for (const y of hl) { const dd = Math.abs(y - exp); if (dd < bd) { bd = dd; hit = y; } }
+          if (bd > 0.18 * d) {
+            // une ligne peut manquer : on tente le pas suivant
+            const exp2 = last + 2 * dir * d;
+            let hit2 = null, bd2 = 1e9;
+            for (const y of hl) { const dd = Math.abs(y - exp2); if (dd < bd2) { bd2 = dd; hit2 = y; } }
+            if (bd2 > 0.18 * d) break;
+            hit = hit2; steps += 2;
+          } else steps += 1;
+          mem.push(hit);
+          d = Math.abs(hit - anchor) / steps;
+          last = hit;
+        }
+      }
+      if (!best || mem.length > best.mem.length) best = { anchor, mem: [...new Set(mem)].sort((u, v) => u - v) };
+    }
+    if (best.mem.length < 4) return null;
+    const dc = (best.mem[best.mem.length - 1] - best.mem[0]) /
+      Math.max(1, Math.round((best.mem[best.mem.length - 1] - best.mem[0]) / d0));
+    const pts = best.mem.map(y => [Math.round((y - best.mem[0]) / dc), y]);
+    const n = pts.length, mx = pts.reduce((s, p) => s + p[0], 0) / n, my = pts.reduce((s, p) => s + p[1], 0) / n;
+    let sxy = 0, sxx = 0;
+    for (const [u, v] of pts) { sxy += (u - mx) * (v - my); sxx += (u - mx) ** 2; }
+    const d = sxy / sxx, c = my - d * mx;
+    const iMin = Math.min(...pts.map(p => p[0])), iMax = Math.max(...pts.map(p => p[0]));
+    return { c, d, iMin, iMax, n };
+  }
+
+  function calibrate(g) {
+    const cx = calibrateX(g), cy = calibrateY(g.hl);
+    g.cx = cx && cx.m >= 4 && cx.expl >= 0.6 ? cx : null;
+    g.cy = cy;
+    g.valid = !!(g.cx && g.cx.m >= 5 && g.cx.expl >= 0.7 && cy && cy.n >= 6);
+    return g;
+  }
+
   function pickGrids(cands) {
     if (!cands.length) return null;
-    const best = cands[0];
-    if (best.red > 0.0008 && best.blue > 0.0008) return { right: best, left: best };
-    const want = best.red > best.blue ? "blue" : "red";
+    const pool = cands.filter(g => g.valid).length ? cands.filter(g => g.valid) : cands;
+    const has = (g, c) => g[c] > 0.0003;
+    const both = pool.filter(g => has(g, "red") && has(g, "blue"));
     const w = x => x.x1 - x.x0, h = x => x.y1 - x.y0;
-    for (const g of cands.slice(1)) {
-      if (Math.abs(w(g) - w(best)) < 0.25 * w(best) && Math.abs(h(g) - h(best)) < 0.25 * h(best) && g[want] > 0.0008)
-        return want === "blue" ? { right: best, left: g } : { right: g, left: best };
+    let pair = null;
+    for (const r of pool) for (const b of pool) {
+      if (r === b || !(r.red > r.blue) || !(b.blue > b.red)) continue;
+      if (Math.abs(w(r) - w(b)) > 0.25 * w(r) || Math.abs(h(r) - h(b)) > 0.25 * h(r)) continue;
+      const aligned = Math.abs(r.y0 - b.y0) < 0.15 * h(r) || Math.abs(r.x0 - b.x0) < 0.15 * w(r);
+      if (!aligned) continue;
+      const sc = r.score + b.score;
+      if (!pair || sc > pair.sc) pair = { sc, right: r, left: b };
     }
+    if (both.length && (!pair || both[0].score >= 0.6 * pair.sc)) return { right: both[0], left: both[0] };
+    if (pair) return { right: pair.right, left: pair.left };
+    const best = pool[0];
     return best.red > best.blue ? { right: best } : { left: best };
   }
 
@@ -437,14 +560,34 @@ const AG = (() => {
       g.x0 = vl[0]; g.x1 = vl[vl.length - 1]; g.y0 = hl[0]; g.y1 = hl[hl.length - 1];
     }
     colorStats(P, g);
+    calibrate(g);
     return g;
   }
 
   // ------------------------------------------------------- pixels ↔ valeurs
-  const xOfF = (g, f, s) => g.x0 + (Math.log(f / s.f_min) / Math.log(s.f_max / s.f_min)) * (g.x1 - g.x0);
-  const dbOfY = (g, y, s) => s.db_min + ((y - g.y0) / Math.max(1, g.y1 - g.y0)) * (s.db_max - s.db_min);
-  const yOfDb = (g, db, s) => g.y0 + ((db - s.db_min) / (s.db_max - s.db_min)) * (g.y1 - g.y0);
+  // Si la grille est étalonnée (lignes repérées), on s'en sert ; sinon on
+  // utilise les graduations des bords données dans les paramètres.
+  const xOfF = (g, f, s) => g.cx ? g.cx.a + g.cx.b * Math.log2(f)
+    : g.x0 + (Math.log(f / s.f_min) / Math.log(s.f_max / s.f_min)) * (g.x1 - g.x0);
+  function dbOfY(g, y, s) {
+    if (g.cy) return s.db_bottom - s.db_step * (g.cy.iMax - (y - g.cy.c) / g.cy.d);
+    return s.db_min + ((y - g.y0) / Math.max(1, g.y1 - g.y0)) * (s.db_max - s.db_min);
+  }
+  function yOfDb(g, db, s) {
+    if (g.cy) return g.cy.c + g.cy.d * (g.cy.iMax - (s.db_bottom - db) / s.db_step);
+    return g.y0 + ((db - s.db_min) / (s.db_max - s.db_min)) * (g.y1 - g.y0);
+  }
   const freqsInRange = s => STD.filter(f => f >= s.f_min * 0.99 && f <= s.f_max * 1.01);
+  function freqsFor(g, s) {
+    if (!g.cx) return freqsInRange(s);
+    const tol = 0.02 * (g.x1 - g.x0);
+    return STD.filter(f => { const x = xOfF(g, f, s); return x >= g.x0 - tol && x <= g.x1 + tol; });
+  }
+  function freqsForGrids(grids, s) {
+    const set = new Set();
+    for (const g of Object.values(grids || {})) for (const f of freqsFor(g, s)) set.add(f);
+    return [...set].sort((a, b) => a - b);
+  }
 
   function curveY(mask, W, reg, x, b, gap, yHint) {
     const xa = Math.max(reg.ox, Math.round(x - b)), xb = Math.min(reg.ex, Math.round(x + b) + 1);
@@ -478,20 +621,47 @@ const AG = (() => {
 
   function extractEar(P, g, ear, s) {
     const gw = g.x1 - g.x0, gh = g.y1 - g.y0;
-    const pad = Math.floor(0.04 * Math.max(gw, gh)) + 4;
-    const reg = { ox: Math.max(0, g.x0 - pad), oy: Math.max(0, g.y0 - pad),
-      ex: Math.min(P.W, g.x1 + pad + 1), ey: Math.min(P.H, g.y1 + pad + 1) };
+    const freqs = freqsFor(g, s);
+    // zone de recherche : les graduations extrêmes + une demi-taille de symbole
+    // (on évite ainsi le texte coloré écrit juste au-dessus de la grille)
+    const pad = Math.max(3, Math.round(0.022 * gh));
+    let yTop = g.y0, yBot = g.y1, xL = g.x0, xR = g.x1;
+    if (g.cy) { yTop = g.cy.c + g.cy.d * g.cy.iMin; yBot = g.cy.c + g.cy.d * g.cy.iMax; }
+    if (g.cx && freqs.length) { xL = xOfF(g, freqs[0], s); xR = xOfF(g, freqs[freqs.length - 1], s); }
+    const reg = { ox: Math.max(0, Math.round(xL - pad)), oy: Math.max(0, Math.round(yTop - pad)),
+      ex: Math.min(P.W, Math.round(xR + pad) + 1), ey: Math.min(P.H, Math.round(yBot + pad) + 1) };
     const mask = ear === "right" ? P.red : P.blue, W = P.W;
-    const freqs = freqsInRange(s);
-    const octPx = gw / Math.log2(s.f_max / s.f_min);
+    const octPx = g.cx ? g.cx.b : gw / Math.log2(s.f_max / s.f_min);
     const b = Math.max(2, 0.006 * gw), gap = Math.max(4, Math.floor(0.045 * gh));
     const xs = {}; for (const f of freqs) xs[f] = xOfF(g, f, s);
     const allX = STD.map(f => xOfF(g, f, s));
-    const found = {}, exts = [];
+    const found = {}, exts = [], extOf = {};
+    // bande étroite d'abord ; si rien (symbole dont le haut et le bas sont
+    // masqués, p. ex. par un crochet de conduction osseuse), bande large
+    const bWide = Math.max(b, 0.02 * gh);
+    const findY = x => { const r1 = curveY(mask, W, reg, x, b, gap, null);
+      return r1[0] != null ? r1 : curveY(mask, W, reg, x, bWide, gap, null); };
     for (const f of freqs) {
       if (!OCT.has(f)) continue;
-      const [y, ext] = curveY(mask, W, reg, xs[f], b, gap, null);
-      if (y != null) { found[f] = y; exts.push(ext); }
+      const [y, ext] = findY(xs[f]);
+      if (y != null) { found[f] = y; exts.push(ext); extOf[f] = ext; }
+    }
+    // un « point » qui compte bien moins de pixels que les autres symboles de
+    // la même oreille est une tache parasite (bout de texte, liseré) : écarté
+    {
+      const rr = Math.max(3, 0.02 * gh), cnt = {};
+      for (const f of Object.keys(found)) {
+        const x = xs[f], y = found[f];
+        let c = 0;
+        for (let yy = Math.max(reg.oy, Math.round(y - rr)); yy <= Math.min(reg.ey - 1, Math.round(y + rr)); yy++)
+          for (let xx = Math.max(reg.ox, Math.round(x - rr)); xx <= Math.min(reg.ex - 1, Math.round(x + rr)); xx++) c += mask[yy * W + xx];
+        cnt[f] = c;
+      }
+      const cs = Object.values(cnt).sort((u, v) => u - v);
+      if (cs.length >= 3) {
+        const med = cs[cs.length >> 1];
+        for (const f of Object.keys(cnt)) if (cnt[f] < 0.12 * med) delete found[f];
+      }
     }
     let r;
     if (exts.length) { const e = [...exts].sort((a, c) => a - c); const m = e.length;
@@ -501,7 +671,7 @@ const AG = (() => {
     for (const f of freqs) {
       if (OCT.has(f)) continue;
       const x = xs[f];
-      const [y] = curveY(mask, W, reg, x, b, gap, null);
+      const [y] = findY(x);
       if (y == null) continue;
       const dens = density(mask, W, reg, x, y, r, r);
       const refs = [];
@@ -543,7 +713,7 @@ const AG = (() => {
   }
 
   return { STD, OCT, EARS, DEFAULTS, prep, findGrids, pickGrids, gridFromRect, extract, analyse,
-    xOfF, yOfDb, freqsInRange, pta };
+    xOfF, yOfDb, freqsInRange, freqsFor, freqsForGrids, pta };
 })();
 if (typeof module !== "undefined") module.exports = AG;
 
@@ -704,7 +874,7 @@ if (typeof module !== "undefined") module.exports = AG;
       c.strokeStyle = "#00a651"; c.lineWidth = 2;
       c.strokeRect(X(g.x0), Y(g.y0), (g.x1 - g.x0) * k, (g.y1 - g.y0) * k);
       c.lineWidth = 1; c.strokeStyle = "rgba(0,166,81,.6)";
-      for (const f of AG.freqsInRange(S)) {
+      for (const f of AG.freqsFor(g, S)) {
         const x = X(AG.xOfF(g, f, S)); c.beginPath(); c.moveTo(x, Y(g.y0)); c.lineTo(x, Y(g.y1)); c.stroke();
       }
     }
@@ -723,11 +893,11 @@ if (typeof module !== "undefined") module.exports = AG;
   function showReview() {
     show("p-review");
     $("rv-label").value = current.label;
-    for (const k of ["f_min", "f_max", "db_min", "db_max"]) $("ax-" + k).value = S[k];
+    for (const k of ["db_bottom", "db_step"]) $("ax-" + k).value = S[k];
     drawOverlay();
     const tb = $("rv-table");
     tb.innerHTML = "<tr><th>Fréquence</th><th class='od'>OD (dB)</th><th class='og'>OG (dB)</th></tr>";
-    for (const f of AG.freqsInRange(S)) {
+    for (const f of AG.freqsForGrids(current.grids, S)) {
       const tr = document.createElement("tr");
       tr.innerHTML = `<td>${f} Hz</td>` + AG.EARS.map(e => {
         const v = current.data[e][f];
@@ -740,8 +910,8 @@ if (typeof module !== "undefined") module.exports = AG;
 
   function reread() {
     const n = {};
-    for (const k of ["f_min", "f_max", "db_min", "db_max"]) n[k] = parseFloat($("ax-" + k).value.replace(",", "."));
-    if (Object.values(n).some(isNaN) || n.f_min <= 0 || n.f_max <= n.f_min || n.db_max <= n.db_min) {
+    for (const k of ["db_bottom", "db_step"]) n[k] = parseFloat($("ax-" + k).value.replace(",", "."));
+    if (Object.values(n).some(isNaN) || n.db_step <= 0) {
       status("Graduations incohérentes.", "err"); return;
     }
     Object.assign(S, n); saveS(); syncSettingsForm();
@@ -850,7 +1020,10 @@ if (typeof module !== "undefined") module.exports = AG;
     return `rgb(${a.map((v, i) => Math.round(v + (b[i] - v) * t)).join(",")})`;
   }
   const flabel = f => (f >= 1000 ? `${f / 1000}k` : `${f}`);
-  const fmt = v => (Math.round(v * 10) / 10).toString().replace(".", ",");
+  // arrondi au dixième « au pair le plus proche », comme les audiomètres (63,75 → 63,8 ; 76,25 → 76,2)
+  const round1 = v => { const x = v * 10, f = Math.floor(x), d = x - f;
+    const r = Math.abs(d - 0.5) < 1e-9 ? (f % 2 === 0 ? f : f + 1) : Math.round(x); return r / 10; };
+  const fmt = v => round1(v).toString().replace(".", ",");
 
   function drawChart(c, k, x, y, w, h, ear, list, rng) {
     const { fmin, fmax, dbmin, dbmax } = rng;
@@ -1076,11 +1249,11 @@ if (typeof module !== "undefined") module.exports = AG;
 
   // ------------------------------------------------------------ paramètres
   function syncSettingsForm() {
-    for (const k of ["f_min", "f_max", "db_min", "db_max"]) $("st-" + k).value = S[k];
+    for (const k of ["db_bottom", "db_step"]) $("st-" + k).value = S[k];
     $("st-round").checked = !!S.round_5;
   }
   function saveSettingsForm() {
-    for (const k of ["f_min", "f_max", "db_min", "db_max"]) {
+    for (const k of ["db_bottom", "db_step"]) {
       const v = parseFloat($("st-" + k).value.replace(",", ".")); if (!isNaN(v)) S[k] = v;
     }
     S.round_5 = $("st-round").checked; saveS();
