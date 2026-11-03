@@ -1582,7 +1582,7 @@ if (typeof module !== "undefined") module.exports = AG;
     c.fillText(`${JOURS[now.getDay()]} ${now.getDate()} ${MOIS_L[now.getMonth()]} ${now.getFullYear()}`, 17 * k, 82 * k);
     font(c, k, 7.5); c.fillStyle = "#555";
     const shown = [opts.air && "aérienne", opts.bone && "osseuse", opts.voc && "vocale"].filter(Boolean).join(", ") || "aucune courbe";
-    c.fillText(`Superposition de ${list.length} examen(s) : ${list.map(a => a.label).join(", ")} (du plus clair au plus foncé) — ${shown}`, 18 * k, 97 * k, 560 * k);
+    c.fillText(`Audiogramme comparatif — audiométrie ${[A && "tonale", V && "vocale"].filter(Boolean).join(" et ") || "tonale"} — examens du ${list.map(a => a.label).join(", ")} (du plus clair au plus foncé)`, 18 * k, 97 * k, 560 * k);
 
     // --- tableau des seuils
     const rows = [];
@@ -1620,7 +1620,7 @@ if (typeof module !== "undefined") module.exports = AG;
     }
     for (const r of vrows) text.push(r.cells.join(" | "));
     c.textAlign = "left"; c.textBaseline = "alphabetic"; c.fillStyle = "#777"; font(c, k, 6);
-    c.fillText("CA = conduction aérienne, CO = conduction osseuse. Perte moyenne : moyenne 500, 1000, 2000 et 4000 Hz (BIAP).", 20 * k, 830 * k);
+    c.fillText("Audiogramme — CA = conduction aérienne, CO = conduction osseuse. Perte moyenne : moyenne 500, 1000, 2000 et 4000 Hz (BIAP).", 20 * k, 830 * k);
     return { canvas: cv, text, pw: PW, ph: PH };
   }
   function yLabel(c, k, x, y) {
@@ -1654,9 +1654,14 @@ if (typeof module !== "undefined") module.exports = AG;
     const put = b => { if (typeof b === "string") b = enc(b); chunks.push(b); pos += b.length; };
     put("%PDF-1.4\n%\xE2\xE3\xCF\xD3\n");
     const obj = (n, body) => { offs[n] = pos; put(`${n} 0 obj\n`); body(); put("\nendobj\n"); };
-    let content = `q ${PW} 0 0 ${PH} 0 0 cm /Im0 Do Q\nBT 3 Tr /F1 6 Tf 20 ${PH - 10} Td 7 TL\n`;
-    for (const l of lines) content += `(${esc(l)}) '\n`;
-    content += "ET";
+    // page image seule, comme les PDF de l'audiomètre (pas de calque texte :
+    // Doctolib lit la page elle-même et la classe comme un audiogramme)
+    let content = `q ${PW} 0 0 ${PH} 0 0 cm /Im0 Do Q`;
+    if (lines && lines.length) {
+      content += `\nBT 3 Tr /F1 6 Tf 20 ${PH - 10} Td 7 TL\n`;
+      for (const l of lines) content += `(${esc(l)}) '\n`;
+      content += "ET";
+    }
     const cbytes = enc(content);
     obj(1, () => put("<< /Type /Catalog /Pages 2 0 R >>"));
     obj(2, () => put("<< /Type /Pages /Kids [3 0 R] /Count 1 >>"));
@@ -1664,7 +1669,7 @@ if (typeof module !== "undefined") module.exports = AG;
     obj(4, () => { put(`<< /Length ${cbytes.length} >>\nstream\n`); put(cbytes); put("\nendstream"); });
     obj(5, () => { put(`<< /Type /XObject /Subtype /Image /Width ${iw} /Height ${ih} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpeg.length} >>\nstream\n`); put(jpeg); put("\nendstream"); });
     obj(6, () => put("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>"));
-    obj(7, () => put(`<< /Title (${esc(title)}) /Producer (Superposeur d'audiogrammes) >>`));
+    obj(7, () => put(`<< /Title (${esc(title)}) /Subject (Audiogramme - audiometrie tonale et vocale) /Keywords (audiogramme audiometrie ORL) /Creator (Audiometrie) >>`));
     const xref = pos;
     let x = "xref\n0 8\n0000000000 65535 f \n";
     for (let n = 1; n <= 7; n++) x += String(offs[n]).padStart(10, "0") + " 00000 n \n";
@@ -1680,7 +1685,7 @@ if (typeof module !== "undefined") module.exports = AG;
     const { canvas, text, pw, ph } = renderPage(items, ident, opts());
     const jpegBlob = await new Promise(r => canvas.toBlob(r, "image/jpeg", 0.92));
     const jpeg = new Uint8Array(await jpegBlob.arrayBuffer());
-    const blob = buildPdf(jpeg, canvas.width, canvas.height, `${ident.nom} ${ident.prenom} Audiogramme`.trim(), text, pw, ph);
+    const blob = buildPdf(jpeg, canvas.width, canvas.height, `Audiogramme ${ident.nom} ${ident.prenom}`.trim(), [], pw, ph);
     const d = new Date(), p2 = n => String(n).padStart(2, "0");
     // même convention que les fichiers de l'audiomètre : NOM_PRENOM_Audiogramme_AAAA-MM-JJ.pdf
     const up = s => safeName(s || "").toUpperCase();
