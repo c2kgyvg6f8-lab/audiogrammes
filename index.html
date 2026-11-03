@@ -36,8 +36,7 @@
   ul#list li { display:flex; align-items:center; gap:8px; padding:6px 8px; border-bottom:1px solid var(--line); font-size:13px; }
   ul#list li:last-child { border-bottom:0; }
   ul#list .n { width:20px; height:20px; border-radius:50%; background:#eef1f4; display:grid; place-items:center; font-size:11px; font-weight:700; flex:none; }
-  ul#list .lb { flex:1; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  ul#list .pts { color:var(--mute); font-size:11.5px; }
+    ul#list .pts { color:var(--mute); font-size:11.5px; }
   ul#list .acts button { padding:1px 5px; font-size:11px; border-radius:5px; margin-left:1px; }
   #empty { font-size:12.5px; color:var(--mute); padding:10px; border:1px dashed #cfd4dc; border-radius:8px; text-align:center; }
   .status { overflow-wrap:anywhere; font-size:12.5px; padding:8px 10px; border-radius:8px; background:#f0f2f5; color:#444; min-height:34px; }
@@ -67,13 +66,32 @@
   .sent { margin-top:12px; padding:10px 12px; background:#e6f4f1; border-radius:8px; color:#0a5a52; display:flex; justify-content:space-between; align-items:center; }
   .legendhint { display:flex; gap:14px; font-size:12px; color:var(--mute); margin-bottom:8px; }
   .legendhint b.od { color:var(--od); } .legendhint b.og { color:var(--og); }
+  .top { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
+  .pin { padding:4px 8px; font-size:12px; white-space:nowrap; }
+  #btn-unpip { display:none; }
+  body.pip #btn-pip { display:none; } body.pip #btn-unpip { display:inline-block; }
+  body.pip { background:#fff; } body.pip aside { border:0; min-height:100vh; padding:12px 14px 18px; gap:11px; }
+  body.pip h1 small { display:none; }
+  body.pip-open .wrap { grid-template-columns:1fr; }
+  ul#list input.lb { flex:1; min-width:0; border:1px solid transparent; background:transparent; padding:3px 5px; font-weight:600; border-radius:5px; }
+  ul#list input.lb:hover { border-color:#d8dce2; } ul#list input.lb:focus { background:#fff; border-color:var(--acc); }
+  .chips { display:flex; gap:6px; }
+  .chips label { flex:1; } .chips input { display:none; }
+  .chips span { display:block; text-align:center; padding:6px 4px; border:1px solid #cfd4dc; border-radius:999px; font-size:12.5px; cursor:pointer; user-select:none; }
+  .chips input:checked + span { background:var(--acc); border-color:var(--acc); color:#fff; font-weight:600; }
+  #mini { margin-top:8px; } #mini img { width:100%; border:1px solid var(--line); border-radius:6px; cursor:zoom-in; display:block; }
+  .review { grid-template-columns:minmax(0,1fr) 360px; }
   @media (max-width: 900px) { .wrap { grid-template-columns:1fr; } aside { border-right:0; border-bottom:1px solid var(--line); } .review { grid-template-columns:1fr; } }
 </style>
 </head>
 <body>
 <div class="wrap">
-<aside>
-  <h1>Superposeur d'audiogrammes<small>Capture à l'écran · superposition · envoi Doctolib</small></h1>
+<aside id="aside">
+  <div class="top">
+    <h1>Superposeur d'audiogrammes<small>Capture · superposition · envoi Doctolib</small></h1>
+    <button id="btn-pip" class="pin" title="Ouvrir une petite fenêtre qui reste au-dessus de Doctolib">📌 Au premier plan</button>
+    <button id="btn-unpip" class="pin" title="Remettre dans l'onglet Chrome">↩ Onglet</button>
+  </div>
 
   <div>
     <label class="f" for="patient">Patient (titre et nom du fichier)</label>
@@ -83,14 +101,14 @@
   <div>
     <div class="step">1 · Source</div>
     <button id="btn-share" class="btn-wide">🖥  Choisir la fenêtre ou l'écran à lire</button>
-    <div class="src" id="src-on" hidden><video id="video" muted playsinline></video><span id="src-kind"></span></div>
+    <div class="src" id="src-on" hidden><video id="thumb" muted playsinline></video><span id="src-kind"></span></div>
   </div>
 
   <div>
     <div class="step">2 · Capturer chaque audiogramme</div>
     <button id="btn-capture" class="btn-main" disabled>📷  Capturer l'audiogramme affiché</button>
-    <label class="chk"><input type="checkbox" id="delay"> Retardateur 3 s (si l'écran entier est partagé)</label>
-    <p class="hint">ou collez une capture d'écran (<b>Ctrl+V</b>), glissez une image ici, ou
+    <label class="chk"><input type="checkbox" id="delay"> Retardateur 3 s (écran entier partagé)</label>
+    <p class="hint">ou collez une capture (<b>Ctrl+V</b>), glissez une image, ou
       <label style="text-decoration:underline;cursor:pointer">importez un fichier<input type="file" id="file" accept="image/*" hidden></label>.</p>
   </div>
 
@@ -101,8 +119,18 @@
   </div>
 
   <div>
+    <div class="step">Courbes à afficher</div>
+    <div class="chips">
+      <label><input type="checkbox" id="show-air"><span>Aérienne</span></label>
+      <label><input type="checkbox" id="show-bone"><span>Osseuse</span></label>
+      <label><input type="checkbox" id="show-voc"><span>Vocale</span></label>
+    </div>
+    <div id="mini" hidden><img id="mini-img" alt="Aperçu de la superposition" title="Cliquer pour agrandir"></div>
+  </div>
+
+  <div>
     <div class="step">3 · Superposer et envoyer</div>
-    <button id="btn-sup" class="btn-main" disabled>Superposer les audiogrammes</button>
+    <button id="btn-sup" class="btn-main" disabled>Superposer (PDF)</button>
     <div style="height:8px"></div>
     <button id="btn-send" class="btn-send" disabled>Envoyer vers Doctolib</button>
     <div class="folder" style="margin-top:6px"><span>Dossier Doctolib : <b id="folder">pas encore choisi</b></span><button id="btn-folder">Choisir…</button></div>
@@ -127,28 +155,28 @@
 </aside>
 
 <main>
+  <video id="video" muted playsinline hidden></video>
   <section id="p-help" class="panel help">
     <h2>Mode d'emploi</h2>
     <ol>
-      <li><b>Choisir la source</b> : dans la fenêtre de Chrome, sélectionnez de préférence la <b>fenêtre</b> du logiciel
-        d'audiométrie, ou l'<b>onglet</b> Chrome (Doctolib, PDF…) où s'affichent les audiogrammes. La capture fonctionne
-        alors même si cette page-ci est au premier plan. À faire une seule fois par séance.</li>
-      <li>Affichez un audiogramme, revenez ici et cliquez sur <b>Capturer</b>. La grille est repérée automatiquement ;
-        les points lus apparaissent entourés, avec un tableau modifiable. Tapez la date de l'examen et validez.</li>
-      <li>Affichez l'audiogramme suivant, capturez, etc. Rangez-les du plus ancien au plus récent (▲ ▼).</li>
-      <li><b>Superposer</b> crée le PDF ; <b>Envoyer vers Doctolib</b> l'écrit dans le dossier d'import (passerelle) de
-        Doctolib, choisi une fois pour toutes.</li>
+      <li><b>Choisir la source</b> (une fois par séance) : de préférence la <b>fenêtre</b> du logiciel Doctolib ou d'audiométrie.
+        La capture marche même quand cet outil est devant.</li>
+      <li>Cliquez sur <b>📌 Au premier plan</b> : les commandes passent dans une petite fenêtre qui reste au-dessus de Doctolib.</li>
+      <li>Affichez un audiogramme, cliquez sur <b>Capturer</b> : il est lu et ajouté directement, sans validation. Tapez sa date dans la
+        liste. ✎ permet de vérifier ou corriger un examen à tout moment.</li>
+      <li>Cochez les courbes à afficher : <b>aérienne</b>, <b>osseuse</b>, <b>vocale</b> (une, deux ou les trois). L'aperçu se met à jour.</li>
+      <li><b>Envoyer vers Doctolib</b> crée le PDF et l'écrit dans le dossier d'import (passerelle) de Doctolib.</li>
     </ol>
-    <div class="legendhint"><span><b class="od">Rouge</b> = oreille droite</span><span><b class="og">Bleu</b> = oreille gauche</span></div>
-    <div class="tip">Rien ne quitte votre ordinateur : la lecture des audiogrammes et la création du PDF se font dans Chrome.
-      Sur Mac, autorisez Chrome dans Réglages Système › Confidentialité et sécurité › <i>Enregistrement de l'écran</i>.</div>
+    <div class="legendhint"><span><b class="od">Rouge</b> = oreille droite</span><span><b class="og">Bleu</b> = oreille gauche</span><span><b style="color:#2e7d32">Vert</b> = conduction osseuse</span></div>
+    <div class="tip">Rien ne quitte votre ordinateur : la lecture et le PDF se font dans Chrome.
+      La première fois, faites « Envoyer » depuis cet onglet pour que Chrome autorise le dossier Doctolib ; ensuite, la fenêtre flottante suffit.</div>
   </section>
 
   <section id="p-review" class="panel" hidden>
-    <h2>Vérifier l'audiogramme lu</h2>
+    <h2>Vérifier / modifier l'audiogramme</h2>
     <div class="review">
       <div>
-        <div class="legendhint"><span>Cercles = points lus — ils doivent tomber sur les symboles</span></div>
+        <div class="legendhint"><span>Points lus : <b class="od">rouge</b> OD, <b class="og">bleu</b> OG, <b style="color:#2e7d32">carrés verts</b> osseuse — ils doivent tomber sur les symboles</span></div>
         <canvas id="ov"></canvas>
       </div>
       <div>
@@ -157,6 +185,10 @@
         <div style="height:10px"></div>
         <table id="rv-table"></table>
         <p class="hint">Case vide = fréquence non mesurée.</p>
+        <label class="f" for="rv-voc-r" style="margin-top:8px">Vocale OD (dB:% , …)</label>
+        <input id="rv-voc-r" type="text" placeholder="55:0, 60:20, 70:58">
+        <label class="f" for="rv-voc-l" style="margin-top:6px">Vocale OG (dB:% , …)</label>
+        <input id="rv-voc-l" type="text">
         <div class="axes">
           <b>Si tous les points sont décalés en hauteur</b>
           <div class="grid2">
@@ -166,7 +198,7 @@
           <button id="rv-reread" style="margin-top:8px;width:100%">Relire</button>
         </div>
         <div class="actions">
-          <button id="rv-ok" class="ok">✔ Valider</button>
+          <button id="rv-ok" class="ok">✔ Enregistrer</button>
           <button id="rv-manual">Encadrer à la main</button>
           <button id="rv-cancel">Annuler</button>
         </div>
@@ -199,13 +231,14 @@ const AG = (() => {
   const STD = [125, 250, 500, 750, 1000, 1500, 2000, 3000, 4000, 6000, 8000];
   const OCT = new Set([125, 250, 500, 1000, 2000, 4000, 8000]);
   const EARS = ["right", "left"];
-  const DEFAULTS = { f_min: 125, f_max: 8000, db_min: -10, db_max: 120, db_bottom: 120, db_step: 10, round_5: true };
+  const DEFAULTS = { f_min: 125, f_max: 8000, db_min: -10, db_max: 120, db_bottom: 120, db_step: 10, round_5: true,
+    voc_x_right: 120, voc_x_step: 10 };
 
   // ---------------------------------------------------------------- pixels
   function prep(imgData) {
     const { width: W, height: H, data } = imgData;
     const n = W * H;
-    const gray = new Uint8Array(n), red = new Uint8Array(n), blue = new Uint8Array(n);
+    const gray = new Uint8Array(n), red = new Uint8Array(n), blue = new Uint8Array(n), green = new Uint8Array(n);
     for (let i = 0, p = 0; i < n; i++, p += 4) {
       const r = data[p], g = data[p + 1], b = data[p + 2];
       gray[i] = (0.299 * r + 0.587 * g + 0.114 * b + 0.5) | 0;
@@ -223,6 +256,7 @@ const AG = (() => {
       h /= 2;
       if ((h <= 10 || h >= 168) && s >= 90 && mx >= 70) red[i] = 1;
       else if (h >= 95 && h <= 135) blue[i] = 1;
+      else if (h >= 40 && h <= 85 && s >= 35 && d >= 24) green[i] = 1;
     }
     // Lissage « ClearType » : le texte noir est dessiné avec des liserés
     // colorés (bleu à côté d'orange, rouge à côté de cyan). Un vrai symbole
@@ -243,24 +277,24 @@ const AG = (() => {
       const row = y * W;
       for (let x = 0; x < W; x++) {
         const i = row + x;
-        if (!red[i] && !blue[i]) continue;
+        if (!red[i] && !blue[i] && !green[i]) continue;
         for (let dx = -2; dx <= 2; dx++) {
           const xx = x + dx;
           if (!dx || xx < 0 || xx >= W) continue;
           const j = row + xx;
-          if (dark[j] || (blue[i] && warm(j)) || (red[i] && cyan(j))) { red[i] = 0; blue[i] = 0; break; }
+          if (dark[j] || (blue[i] && warm(j)) || (red[i] && cyan(j))) { red[i] = 0; blue[i] = 0; green[i] = 0; break; }
         }
       }
     }
-    return { W, H, gray, red, blue };
+    return { W, H, gray, red, blue, green };
   }
 
   function crop(P, x0, y0, x1, y1) {
     const W = x1 - x0, H = y1 - y0;
-    const out = { W, H, gray: new Uint8Array(W * H), red: new Uint8Array(W * H), blue: new Uint8Array(W * H) };
+    const out = { W, H, gray: new Uint8Array(W * H), red: new Uint8Array(W * H), blue: new Uint8Array(W * H), green: new Uint8Array(W * H) };
     for (let y = 0; y < H; y++) {
       const a = (y + y0) * P.W + x0;
-      for (const k of ["gray", "red", "blue"]) out[k].set(P[k].subarray(a, a + W), y * W);
+      for (const k of ["gray", "red", "blue", "green"]) out[k].set(P[k].subarray(a, a + W), y * W);
     }
     return out;
   }
@@ -479,8 +513,9 @@ const AG = (() => {
     let best = null;
     for (const anchor of hl) {
       const mem = [anchor];
+      let dChain = d0;
       for (const dir of [1, -1]) {
-        let last = anchor, d = d0, steps = 0;
+        let last = anchor, d = dChain, steps = 0;
         for (;;) {
           const exp = last + dir * d;
           let hit = null, bd = 1e9;
@@ -497,12 +532,12 @@ const AG = (() => {
           d = Math.abs(hit - anchor) / steps;
           last = hit;
         }
+        dChain = d;
       }
-      if (!best || mem.length > best.mem.length) best = { anchor, mem: [...new Set(mem)].sort((u, v) => u - v) };
+      if (!best || mem.length > best.mem.length) best = { anchor, d: dChain, mem: [...new Set(mem)].sort((u, v) => u - v) };
     }
     if (best.mem.length < 4) return null;
-    const dc = (best.mem[best.mem.length - 1] - best.mem[0]) /
-      Math.max(1, Math.round((best.mem[best.mem.length - 1] - best.mem[0]) / d0));
+    const dc = best.d;
     const pts = best.mem.map(y => [Math.round((y - best.mem[0]) / dc), y]);
     const n = pts.length, mx = pts.reduce((s, p) => s + p[0], 0) / n, my = pts.reduce((s, p) => s + p[1], 0) / n;
     let sxy = 0, sxx = 0;
@@ -619,7 +654,7 @@ const AG = (() => {
     return c / (xb - xa);
   }
 
-  function extractEar(P, g, ear, s) {
+  function extractEar(P, g, ear, s, kind) {
     const gw = g.x1 - g.x0, gh = g.y1 - g.y0;
     const freqs = freqsFor(g, s);
     // zone de recherche : les graduations extrêmes + une demi-taille de symbole
@@ -630,7 +665,7 @@ const AG = (() => {
     if (g.cx && freqs.length) { xL = xOfF(g, freqs[0], s); xR = xOfF(g, freqs[freqs.length - 1], s); }
     const reg = { ox: Math.max(0, Math.round(xL - pad)), oy: Math.max(0, Math.round(yTop - pad)),
       ex: Math.min(P.W, Math.round(xR + pad) + 1), ey: Math.min(P.H, Math.round(yBot + pad) + 1) };
-    const mask = ear === "right" ? P.red : P.blue, W = P.W;
+    const mask = kind === "bone" ? P.green : ear === "right" ? P.red : P.blue, W = P.W;
     const octPx = g.cx ? g.cx.b : gw / Math.log2(s.f_max / s.f_min);
     const b = Math.max(2, 0.006 * gw), gap = Math.max(4, Math.floor(0.045 * gh));
     const xs = {}; for (const f of freqs) xs[f] = xOfF(g, f, s);
@@ -660,7 +695,7 @@ const AG = (() => {
       const cs = Object.values(cnt).sort((u, v) => u - v);
       if (cs.length >= 3) {
         const med = cs[cs.length >> 1];
-        for (const f of Object.keys(cnt)) if (cnt[f] < 0.12 * med) delete found[f];
+        for (const f of Object.keys(cnt)) if (cnt[f] < (kind === "bone" ? 0.15 : 0.12) * med) delete found[f];
       }
     }
     let r;
@@ -696,15 +731,127 @@ const AG = (() => {
   }
 
   function extract(P, grids, s) {
-    const out = { right: {}, left: {} };
-    for (const ear of EARS) if (grids[ear]) out[ear] = extractEar(P, grids[ear], ear, s).values;
+    const out = { right: {}, left: {}, boneRight: {}, boneLeft: {} };
+    for (const ear of EARS) if (grids[ear]) out[ear] = extractEar(P, grids[ear], ear, s, "air").values;
+    // conduction osseuse (crochets verts) : seulement si chaque oreille a sa grille
+    if (grids.right && grids.left && grids.right !== grids.left) {
+      out.boneRight = extractEar(P, grids.right, "right", s, "bone").values;
+      out.boneLeft = extractEar(P, grids.left, "left", s, "bone").values;
+    }
+    return out;
+  }
+
+  // ------------------------------------------------- audiométrie vocale
+  // Graphe « % d'intelligibilité » (vertical, 0 en bas) en fonction des dB
+  // (horizontal, une ligne tous les 10 dB, dernière ligne à droite = 120 dB).
+  function findVocale(cands, used) {
+    let best = null;
+    for (const g of cands) {
+      if (used.includes(g) || g.valid) continue;
+      const vx = calibrateY(g.vl), vy = g.cy;
+      if (!vx || !vy || vx.n < 8 || vy.n < 6) continue;
+      if (g.red + g.blue < 0.0003) continue;
+      const area = (g.x1 - g.x0) * (g.y1 - g.y0);
+      if (!best || area > best.area) best = { g, area, vx };
+    }
+    if (!best) return null;
+    const g = best.g;
+    g.vx = best.vx;
+    // axe des dB : de -10 à 120 dB (une ligne tous les 5 ou 10 dB) ;
+    // axe des % : de 0 à 100 % (une ligne tous les 5 ou 10 %)
+    const span = g.vx.iMax - g.vx.iMin;
+    g.vxStep = span >= 20 ? 130 / span : 10;
+    g.vxStep = Math.abs(g.vxStep - 5) < 1 ? 5 : Math.abs(g.vxStep - 10) < 2 ? 10 : g.vxStep;
+    const spy = g.cy.iMax - g.cy.iMin;
+    g.vyStep = spy >= 15 ? 5 : 10;
+    return g;
+  }
+  const vDbOfX = (g, x, s) => s.voc_x_right - g.vxStep * (g.vx.iMax - (x - g.vx.c) / g.vx.d);
+  const vXOfDb = (g, db, s) => g.vx.c + g.vx.d * (g.vx.iMax - (s.voc_x_right - db) / g.vxStep);
+  const vPctOfY = (g, y) => g.vyStep * (g.cy.iMax - (y - g.cy.c) / g.cy.d);
+  const vYOfPct = (g, p) => g.cy.c + g.cy.d * (g.cy.iMax - p / g.vyStep);
+
+  function extractVocale(P, g, ear, s) {
+    const mask = ear === "right" ? P.red : P.blue, W = P.W;
+    const d5 = g.vx.d * 5 / g.vxStep, gh = g.y1 - g.y0;
+    const pad = Math.max(3, Math.round(0.04 * gh));
+    const xL = g.vx.c + g.vx.d * g.vx.iMin, xR = g.vx.c + g.vx.d * g.vx.iMax;
+    const yT = g.cy.c + g.cy.d * g.cy.iMin, yB = g.cy.c + g.cy.d * g.cy.iMax;
+    const reg = { ox: Math.max(0, Math.round(xL - pad)), oy: Math.max(0, Math.round(yT - pad)),
+      ex: Math.min(P.W, Math.round(xR + pad) + 1), ey: Math.min(P.H, Math.round(yB + pad) + 1) };
+    const gap = Math.max(3, Math.round(0.03 * gh));
+    const b = Math.max(1, 0.12 * d5), rMax = Math.max(3, Math.min(0.7 * d5, 0.06 * gh));
+    const at = (x, y) => { x = Math.round(x); y = Math.round(y);
+      return x >= reg.ox && x < reg.ex && y >= reg.oy && y < reg.ey && mask[y * W + x] === 1; };
+    // nombre de directions (sur 8) où l'on rencontre le tracé à la distance rad :
+    // un trait = 2, une croix = 4 (+ traits), un cercle = 8
+    const ring = (x, y, rad) => {
+      let hits = 0;
+      for (let k = 0; k < 8; k++) {
+        let hit = false;
+        for (const da of [-0.2, 0, 0.2]) {
+          const a = k * Math.PI / 4 + da;
+          for (const rr of [rad - 0.7, rad, rad + 0.7]) if (rr >= 2.5 && at(x + rr * Math.cos(a), y + rr * Math.sin(a))) { hit = true; break; }
+          if (hit) break;
+        }
+        if (hit) hits++;
+      }
+      return hits;
+    };
+    const out = [];
+    const dbL = Math.max(-10, Math.ceil(vDbOfX(g, xL, s) / 5) * 5);
+    const dbR = Math.min(s.voc_x_right, Math.floor(vDbOfX(g, xR, s) / 5) * 5);
+    // épaisseur du trait (pour ne pas confondre un trait épais avec un symbole)
+    const th = [];
+    for (let db = dbL; db < dbR; db += 5) {
+      const xm = vXOfDb(g, db + 2.5, s);
+      const [yy, ext] = curveY(mask, W, reg, xm, 0.5, 1, null);
+      if (yy == null) continue;
+      // épaisseur ≈ min(étendue verticale, étendue horizontale) du trait
+      const yr = Math.round(yy);
+      let x0 = Math.round(xm);
+      if (!at(x0, yr)) { if (at(x0 - 1, yr)) x0--; else if (at(x0 + 1, yr)) x0++; else { th.push(ext); continue; } }
+      let a = x0, z = x0;
+      while (at(a - 1, yr)) a--;
+      while (at(z + 1, yr)) z++;
+      th.push(Math.min(ext, z - a + 1));
+    }
+    th.sort((u, v) => u - v);
+    const thick = th.length ? th[Math.floor(th.length / 4)] : 1;
+    const radMin = Math.max(3, Math.ceil(1.7 * thick));
+    for (let db = dbL; db <= dbR; db += 5) {
+      const x = vXOfDb(g, db, s);
+      let [y] = curveY(mask, W, reg, x, b, gap, null);
+      if (y == null) [y] = curveY(mask, W, reg, x, 0.45 * d5, gap, null);
+      if (y == null) continue;
+      let best = null;
+      for (let yy = Math.round(y - rMax); yy <= Math.round(y + rMax); yy++)
+        for (let rad = radMin; rad <= Math.max(radMin, rMax); rad++) {
+          const h = ring(x, yy, rad);
+          // à score égal : le plus petit rayon puis le plus près du tracé
+          if (!best || h > best.h || (h === best.h && Math.abs(yy - y) < Math.abs(best.y - y) - 0.01)) best = { h, y: yy, rad };
+        }
+      if (best && best.h >= 6) {
+        // centre précis : milieu des positions ex aequo
+        const ys = [];
+        for (let yy = Math.round(y - rMax); yy <= Math.round(y + rMax); yy++) if (ring(x, yy, best.rad) === best.h) ys.push(yy);
+        const yc = ys.length ? (Math.min(...ys) + Math.max(...ys)) / 2 : best.y;
+        out.push([db, Math.max(0, Math.min(100, Math.round(vPctOfY(g, yc))))]);
+      }
+    }
     return out;
   }
 
   function analyse(P, s) {
-    const grids = pickGrids(findGrids(P));
+    s = { ...DEFAULTS, ...s };
+    const cands = findGrids(P);
+    const grids = pickGrids(cands);
     if (!grids) return { grids: null, data: null };
-    return { grids, data: extract(P, grids, s) };
+    const data = extract(P, grids, s);
+    const vg = findVocale(cands, Object.values(grids));
+    data.vocRight = vg ? extractVocale(P, vg, "right", s) : [];
+    data.vocLeft = vg ? extractVocale(P, vg, "left", s) : [];
+    return { grids, data, vgrid: vg };
   }
 
   function pta(v) {
@@ -713,24 +860,26 @@ const AG = (() => {
   }
 
   return { STD, OCT, EARS, DEFAULTS, prep, findGrids, pickGrids, gridFromRect, extract, analyse,
-    xOfF, yOfDb, freqsInRange, freqsFor, freqsForGrids, pta };
+    xOfF, yOfDb, freqsInRange, freqsFor, freqsForGrids, pta, vXOfDb, vYOfPct };
 })();
 if (typeof module !== "undefined") module.exports = AG;
 
 </script>
 <script>
-/* Interface : capture d'écran (Chrome), vérification, PDF superposé, envoi Doctolib. */
+/* Interface : capture d'écran (Chrome), import automatique, fenêtre flottante,
+   affichage aérienne / osseuse / vocale, PDF superposé, envoi Doctolib. */
 (() => {
-  const $ = id => document.getElementById(id);
+  let pip = null;                                   // fenêtre flottante (Document PiP)
+  const $ = id => document.getElementById(id) || (pip && pip.document.getElementById(id));
   const EAR_NAME = { right: "Oreille droite", left: "Oreille gauche" };
   const EAR_COL = { right: "#c62828", left: "#1565c0" };
+  const BONE = { right: "boneRight", left: "boneLeft" }, VOC = { right: "vocRight", left: "vocLeft" };
 
   // ------------------------------------------------------------ réglages
-  const S = { ...AG.DEFAULTS };
+  const S = { ...AG.DEFAULTS, show_air: true, show_bone: false, show_voc: false };
   try { Object.assign(S, JSON.parse(localStorage.getItem("ag_settings") || "{}")); } catch (e) {}
   const saveS = () => { try { localStorage.setItem("ag_settings", JSON.stringify(S)); } catch (e) {} };
 
-  // petit stockage IndexedDB pour le dossier Doctolib
   function idb(mode, fn) {
     return new Promise((res, rej) => {
       const rq = indexedDB.open("superposeur_audiogrammes", 1);
@@ -749,14 +898,15 @@ if (typeof module !== "undefined") module.exports = AG;
 
   // ------------------------------------------------------------ état
   let stream = null, controller = null;
-  const video = $("video");
-  let items = [];       // {label, right, left, canvas, grids}
-  let current = null;   // audiogramme en cours de vérification
-  let pdf = null;       // {blob, name, url}
+  const video = document.getElementById("video");
+  let items = [];       // {label, right, left, boneRight, boneLeft, vocRight, vocLeft, canvas, grids, vgrid}
+  let current = null;   // audiogramme ouvert dans « Modifier » ou en encadrement manuel
+  let pdf = null;
   let dirHandle = null;
 
   const status = (t, kind) => { const el = $("status"); el.textContent = t; el.className = "status " + (kind || ""); };
-  const show = id => { for (const p of ["p-help", "p-review", "p-manual", "p-result"]) $(p).hidden = p !== id; };
+  const show = id => { for (const p of ["p-help", "p-review", "p-manual", "p-result"]) document.getElementById(p).hidden = p !== id; };
+  const nPts = o => Object.keys(o || {}).length;
 
   // ------------------------------------------------------------ partage d'écran
   async function shareScreen() {
@@ -770,24 +920,23 @@ if (typeof module !== "undefined") module.exports = AG;
         audio: false, selfBrowserSurface: "exclude", surfaceSwitching: "include" };
       if (controller) opts.controller = controller;
       stream = await navigator.mediaDevices.getDisplayMedia(opts);
-      if (controller && controller.setFocusBehavior) {
-        try { controller.setFocusBehavior("no-focus-change"); } catch (e) {}
-      }
+      if (controller && controller.setFocusBehavior) { try { controller.setFocusBehavior("no-focus-change"); } catch (e) {} }
     } catch (e) {
       stream = null;
-      status("Partage annulé.", "");
+      status(pip ? "Le partage se choisit depuis l'onglet principal : cliquez sur ↩ puis sur Choisir la fenêtre." : "Partage annulé.", pip ? "err" : "");
       return updateSource();
     }
     video.srcObject = stream;
     await video.play().catch(() => {});
+    const th = $("thumb"); th.srcObject = stream; th.play().catch(() => {});
     const tr = stream.getVideoTracks()[0];
-    tr.addEventListener("ended", () => { stream = null; video.srcObject = null; updateSource(); });
+    tr.addEventListener("ended", () => { stream = null; video.srcObject = null; $("thumb").srcObject = null; updateSource(); });
     const surf = (tr.getSettings && tr.getSettings().displaySurface) || "";
     $("delay").checked = surf === "monitor";
     updateSource(surf);
     status(surf === "monitor"
-      ? "Écran entier partagé : le retardateur de 3 s est activé pour vous laisser le temps d'afficher l'audiogramme."
-      : "Source partagée. Affichez un audiogramme puis cliquez sur Capturer.", "ok");
+      ? "Écran entier partagé : retardateur de 3 s activé pour laisser le temps d'afficher l'audiogramme."
+      : "Source partagée. Cliquez sur 📌 pour garder cette fenêtre au premier plan, puis capturez.", "ok");
   }
 
   function updateSource(surf) {
@@ -796,13 +945,13 @@ if (typeof module !== "undefined") module.exports = AG;
     $("btn-share").textContent = on ? "Changer de source…" : "🖥  Choisir la fenêtre ou l'écran à lire";
     $("btn-capture").disabled = !on;
     const names = { monitor: "écran entier", window: "fenêtre", browser: "onglet Chrome" };
-    $("src-kind").textContent = on ? "Partagé : " + (names[surf] || "source choisie") : "";
+    if (surf !== undefined) $("src-kind").textContent = on ? "Partagé : " + (names[surf] || "source choisie") : "";
   }
 
   async function grabFrame() {
-    if (!stream) throw new Error("Aucune source partagée");
+    if (!stream) throw new Error("aucune source partagée");
     if (video.readyState < 2) await new Promise(r => video.addEventListener("loadeddata", r, { once: true }));
-    await new Promise(r => setTimeout(r, 120));   // laisse arriver une image fraîche
+    await new Promise(r => setTimeout(r, 150));
     const cv = document.createElement("canvas");
     cv.width = video.videoWidth; cv.height = video.videoHeight;
     cv.getContext("2d").drawImage(video, 0, 0);
@@ -815,143 +964,171 @@ if (typeof module !== "undefined") module.exports = AG;
       if ($("delay").checked) {
         for (let i = 3; i > 0; i--) { status(`Capture dans ${i} s… affichez l'audiogramme`, "busy"); await new Promise(r => setTimeout(r, 1000)); }
       }
-      const cv = await grabFrame();
-      processCanvas(cv, `Examen ${items.length + 1}`, -1);
-    } catch (e) {
-      status("Capture impossible : " + e.message, "err");
-    } finally { $("btn-capture").disabled = !stream; }
-  }
-
-  function canvasFromImage(img) {
-    const cv = document.createElement("canvas");
-    cv.width = img.width; cv.height = img.height;
-    cv.getContext("2d").drawImage(img, 0, 0);
-    return cv;
+      processCanvas(await grabFrame());
+    } catch (e) { status("Capture impossible : " + e.message, "err"); }
+    finally { $("btn-capture").disabled = !stream; }
   }
 
   async function importBlob(blob) {
     try {
       const bmp = await createImageBitmap(blob);
-      processCanvas(canvasFromImage(bmp), `Examen ${items.length + 1}`, -1);
+      const cv = document.createElement("canvas");
+      cv.width = bmp.width; cv.height = bmp.height;
+      cv.getContext("2d").drawImage(bmp, 0, 0);
+      processCanvas(cv);
     } catch (e) { status("Image illisible.", "err"); }
   }
 
-  function prepCanvas(cv) {
-    return AG.prep(cv.getContext("2d", { willReadFrequently: true }).getImageData(0, 0, cv.width, cv.height));
-  }
+  const prepCanvas = cv => AG.prep(cv.getContext("2d", { willReadFrequently: true }).getImageData(0, 0, cv.width, cv.height));
 
-  function processCanvas(cv, label, editIndex) {
-    status("Recherche de l'audiogramme…", "busy");
+  // Import direct, sans validation : l'audiogramme est ajouté à la liste.
+  function processCanvas(cv) {
+    status("Lecture de l'audiogramme…", "busy");
     setTimeout(() => {
       const P = prepCanvas(cv);
-      const { grids, data } = AG.analyse(P, S);
-      current = { canvas: cv, P, grids, data, label, editIndex };
-      if (!grids || (!Object.keys(data.right).length && !Object.keys(data.left).length)) {
+      const { grids, data, vgrid } = AG.analyse(P, S);
+      const label = `Examen ${items.length + 1}`;
+      if (!grids || (!nPts(data.right) && !nPts(data.left))) {
+        current = { canvas: cv, P, grids: null, data: null, vgrid: null, label, editIndex: -1 };
         openManual("Je n'ai pas trouvé d'audiogramme lisible. Encadrez la grille à la souris.");
+        if (pip) { status("Audiogramme non trouvé : encadrez-le dans l'onglet principal.", "err"); window.focus(); }
         return;
       }
-      showReview();
-      status("Vérifiez les points lus, tapez la date de l'examen, puis Valider.", "ok");
+      addItem({ label, ...data, canvas: cv, grids, vgrid });
     }, 30);
   }
 
-  // ------------------------------------------------------------ vérification
-  function drawOverlay() {
-    const { canvas: src, grids, data } = current;
-    const gs = [...new Set(Object.values(grids))];
+  function addItem(it) {
+    items.push(it);
+    invalidate(); renderList(); refreshPreview();
+    const parts = [`CA ${nPts(it.right)}·${nPts(it.left)}`];
+    if (nPts(it.boneRight) || nPts(it.boneLeft)) parts.push(`CO ${nPts(it.boneRight)}·${nPts(it.boneLeft)}`);
+    if (it.vocRight.length || it.vocLeft.length) parts.push(`vocale ${it.vocRight.length}·${it.vocLeft.length}`);
+    status(`✔ ${it.label} importé (${parts.join(" · ")} points OD·OG). Tapez sa date dans la liste ; ✎ pour vérifier.`, "ok");
+    const inp = $("list").querySelectorAll("input.lb");
+    const last = inp[inp.length - 1];
+    if (last) { last.focus(); last.select(); }
+  }
+
+  // ------------------------------------------------------------ vérification / modification
+  function overlayBox(grids, vgrid, src) {
+    const gs = [...new Set(Object.values(grids || {}))];
+    if (vgrid) gs.push(vgrid);
     const pad = 40;
-    const ax0 = Math.max(0, Math.min(...gs.map(g => g.x0)) - pad), ay0 = Math.max(0, Math.min(...gs.map(g => g.y0)) - pad);
-    const ax1 = Math.min(src.width, Math.max(...gs.map(g => g.x1)) + pad), ay1 = Math.min(src.height, Math.max(...gs.map(g => g.y1)) + pad);
-    const cv = $("ov"), w = ax1 - ax0, h = ay1 - ay0;
+    return [Math.max(0, Math.min(...gs.map(g => g.x0)) - pad), Math.max(0, Math.min(...gs.map(g => g.y0)) - pad),
+      Math.min(src.width, Math.max(...gs.map(g => g.x1)) + pad), Math.min(src.height, Math.max(...gs.map(g => g.y1)) + pad)];
+  }
+
+  function drawOverlay() {
+    const { canvas: src, grids, vgrid } = current;
+    const d = current.data;
+    const [ax0, ay0, ax1, ay1] = overlayBox(grids, vgrid, src);
+    const cv = document.getElementById("ov"), w = ax1 - ax0, h = ay1 - ay0;
     const k = Math.min(2, 900 / w);
     cv.width = Math.round(w * k); cv.height = Math.round(h * k);
     const c = cv.getContext("2d");
-    c.imageSmoothingQuality = "high";
     c.drawImage(src, ax0, ay0, w, h, 0, 0, cv.width, cv.height);
     c.fillStyle = "rgba(255,255,255,.45)"; c.fillRect(0, 0, cv.width, cv.height);
     const X = x => (x - ax0) * k, Y = y => (y - ay0) * k;
-    for (const g of gs) {
-      c.strokeStyle = "#00a651"; c.lineWidth = 2;
-      c.strokeRect(X(g.x0), Y(g.y0), (g.x1 - g.x0) * k, (g.y1 - g.y0) * k);
-      c.lineWidth = 1; c.strokeStyle = "rgba(0,166,81,.6)";
-      for (const f of AG.freqsFor(g, S)) {
-        const x = X(AG.xOfF(g, f, S)); c.beginPath(); c.moveTo(x, Y(g.y0)); c.lineTo(x, Y(g.y1)); c.stroke();
-      }
+    for (const g of new Set(Object.values(grids))) {
+      c.strokeStyle = "rgba(0,166,81,.55)"; c.lineWidth = 1;
+      for (const f of AG.freqsFor(g, S)) { const x = X(AG.xOfF(g, f, S)); c.beginPath(); c.moveTo(x, Y(g.y0)); c.lineTo(x, Y(g.y1)); c.stroke(); }
     }
-    c.font = "bold 13px system-ui, sans-serif";
+    c.font = "bold 12px system-ui, sans-serif";
+    const ring = (x, y, col, txt, dy, sq) => {
+      c.strokeStyle = c.fillStyle = col; c.lineWidth = 2.5; c.beginPath();
+      if (sq) c.rect(x - 8, y - 8, 16, 16); else c.arc(x, y, 9, 0, 2 * Math.PI);
+      c.stroke(); c.fillText(txt, x + 9, y + dy);
+    };
     for (const ear of AG.EARS) {
       const g = grids[ear]; if (!g) continue;
-      for (const [f, db] of Object.entries(data[ear])) {
-        const x = X(AG.xOfF(g, +f, S)), y = Y(AG.yOfDb(g, db, S));
-        c.strokeStyle = c.fillStyle = EAR_COL[ear]; c.lineWidth = 2.5;
-        c.beginPath(); c.arc(x, y, 10, 0, 2 * Math.PI); c.stroke();
-        c.fillText(String(db), x + 9, ear === "right" ? y - 10 : y + 22);
-      }
+      for (const [f, db] of Object.entries(d[ear])) ring(X(AG.xOfF(g, +f, S)), Y(AG.yOfDb(g, db, S)), EAR_COL[ear], String(db), ear === "right" ? -10 : 20);
+      for (const [f, db] of Object.entries(d[BONE[ear]] || {})) ring(X(AG.xOfF(g, +f, S)), Y(AG.yOfDb(g, db, S)), "#2e7d32", String(db), -10, true);
     }
+    if (vgrid) for (const ear of AG.EARS)
+      for (const [db, p] of d[VOC[ear]] || []) ring(X(AG.vXOfDb(vgrid, db, S)), Y(AG.vYOfPct(vgrid, p)), EAR_COL[ear], p + "%", -10);
+  }
+
+  const vocToText = a => (a || []).map(([d, p]) => `${d}:${p}`).join(", ");
+  function textToVoc(t) {
+    const out = [];
+    for (const part of t.split(/[,;\n]+/)) {
+      const m = part.trim().match(/^(-?\d+(?:[.,]\d+)?)\s*(?:dB)?\s*[:=]\s*(\d+(?:[.,]\d+)?)\s*%?$/i);
+      if (!part.trim()) continue;
+      if (!m) throw new Error(part.trim());
+      out.push([parseFloat(m[1].replace(",", ".")), parseFloat(m[2].replace(",", "."))]);
+    }
+    return out.sort((a, b) => a[0] - b[0]);
   }
 
   function showReview() {
     show("p-review");
-    $("rv-label").value = current.label;
-    for (const k of ["db_bottom", "db_step"]) $("ax-" + k).value = S[k];
+    document.getElementById("rv-label").value = current.label;
+    for (const k of ["db_bottom", "db_step"]) document.getElementById("ax-" + k).value = S[k];
     drawOverlay();
-    const tb = $("rv-table");
-    tb.innerHTML = "<tr><th>Fréquence</th><th class='od'>OD (dB)</th><th class='og'>OG (dB)</th></tr>";
-    for (const f of AG.freqsForGrids(current.grids, S)) {
+    const d = current.data, tb = document.getElementById("rv-table");
+    tb.innerHTML = "<tr><th>Fréquence</th><th class='od'>OD aérienne</th><th class='od'>OD osseuse</th><th class='og'>OG aérienne</th><th class='og'>OG osseuse</th></tr>";
+    const freqs = new Set(AG.freqsForGrids(current.grids, S));
+    for (const k of ["right", "left", "boneRight", "boneLeft"]) for (const f of Object.keys(d[k] || {})) freqs.add(+f);
+    for (const f of [...freqs].sort((a, b) => a - b)) {
       const tr = document.createElement("tr");
-      tr.innerHTML = `<td>${f} Hz</td>` + AG.EARS.map(e => {
-        const v = current.data[e][f];
-        return `<td><input data-f="${f}" data-e="${e}" inputmode="decimal" value="${v == null ? "" : v}"></td>`;
+      tr.innerHTML = `<td>${f} Hz</td>` + ["right", "boneRight", "left", "boneLeft"].map(k => {
+        const v = (d[k] || {})[f];
+        return `<td><input data-f="${f}" data-k="${k}" inputmode="decimal" value="${v == null ? "" : v}"></td>`;
       }).join("");
       tb.appendChild(tr);
     }
-    setTimeout(() => { $("rv-label").focus(); $("rv-label").select(); }, 50);
+    document.getElementById("rv-voc-r").value = vocToText(d.vocRight);
+    document.getElementById("rv-voc-l").value = vocToText(d.vocLeft);
   }
 
   function reread() {
     const n = {};
-    for (const k of ["db_bottom", "db_step"]) n[k] = parseFloat($("ax-" + k).value.replace(",", "."));
-    if (Object.values(n).some(isNaN) || n.db_step <= 0) {
-      status("Graduations incohérentes.", "err"); return;
-    }
+    for (const k of ["db_bottom", "db_step"]) n[k] = parseFloat(document.getElementById("ax-" + k).value.replace(",", "."));
+    if (Object.values(n).some(isNaN) || n.db_step <= 0) { status("Valeurs incohérentes.", "err"); return; }
     Object.assign(S, n); saveS(); syncSettingsForm();
-    current.data = AG.extract(current.P, current.grids, S);
-    current.label = $("rv-label").value;
+    if (!current.P) current.P = prepCanvas(current.canvas);
+    const d = AG.extract(current.P, current.grids, S);
+    current.data = { ...current.data, ...d };
+    current.label = document.getElementById("rv-label").value;
     showReview();
     status("Relu avec les nouvelles graduations (mémorisées).", "ok");
   }
 
-  function validate() {
-    const out = { right: {}, left: {} };
-    for (const inp of $("rv-table").querySelectorAll("input")) {
+  function saveReview() {
+    const out = { right: {}, left: {}, boneRight: {}, boneLeft: {} };
+    for (const inp of document.getElementById("rv-table").querySelectorAll("input")) {
       const t = inp.value.trim().replace(",", ".");
       if (!t) continue;
       const v = parseFloat(t);
       if (isNaN(v)) { inp.focus(); status("Une valeur n'est pas un nombre.", "err"); return; }
-      out[inp.dataset.e][+inp.dataset.f] = v;
+      out[inp.dataset.k][+inp.dataset.f] = v;
     }
-    if (!Object.keys(out.right).length && !Object.keys(out.left).length) { status("Aucune valeur à importer.", "err"); return; }
-    const it = { label: $("rv-label").value.trim() || "Examen", ...out, canvas: current.canvas, grids: current.grids };
+    try {
+      out.vocRight = textToVoc(document.getElementById("rv-voc-r").value);
+      out.vocLeft = textToVoc(document.getElementById("rv-voc-l").value);
+    } catch (e) { status(`Vocale : « ${e.message} » n'est pas au format dB:% (ex. 55:0, 60:20).`, "err"); return; }
+    const it = { label: document.getElementById("rv-label").value.trim() || "Examen", ...out,
+      canvas: current.canvas, grids: current.grids, vgrid: current.vgrid };
     if (current.editIndex >= 0) items[current.editIndex] = it; else items.push(it);
     current = null;
-    invalidate(); renderList(); show("p-help");
-    status(`${items.length} audiogramme(s) importé(s). Affichez le suivant et capturez-le, ou cliquez sur Superposer.`, "ok");
+    invalidate(); renderList(); refreshPreview(); show("p-help");
+    status("Modifications enregistrées.", "ok");
   }
 
   // ------------------------------------------------------------ zone manuelle
   let drag = null;
   function openManual(msg) {
     show("p-manual");
-    $("mn-msg").textContent = msg || "Encadrez la grille de l'audiogramme (au ras du quadrillage).";
-    const src = current.canvas, cv = $("mn");
+    document.getElementById("mn-msg").textContent = msg || "Encadrez la grille de l'audiogramme (au ras du quadrillage).";
+    const src = current.canvas, cv = document.getElementById("mn");
     const k = Math.min(1, 1400 / src.width);
     cv.width = Math.round(src.width * k); cv.height = Math.round(src.height * k);
     cv._k = k;
     redrawManual();
-    status("Tracez un rectangle autour de la grille.", "busy");
   }
   function redrawManual() {
-    const cv = $("mn"), c = cv.getContext("2d");
+    const cv = document.getElementById("mn"), c = cv.getContext("2d");
     c.drawImage(current.canvas, 0, 0, cv.width, cv.height);
     if (drag && drag.x1 != null) {
       c.strokeStyle = "#00c853"; c.lineWidth = 2; c.setLineDash([6, 4]);
@@ -959,23 +1136,26 @@ if (typeof module !== "undefined") module.exports = AG;
     }
   }
   function mpos(e) {
-    const cv = $("mn"), r = cv.getBoundingClientRect();
+    const cv = document.getElementById("mn"), r = cv.getBoundingClientRect();
     return [(e.clientX - r.left) * cv.width / r.width, (e.clientY - r.top) * cv.height / r.height];
   }
   function manualDone() {
-    const cv = $("mn"), k = cv._k;
+    const cv = document.getElementById("mn"), k = cv._k;
     if (!drag || Math.abs(drag.x1 - drag.x0) < 15 || Math.abs(drag.y1 - drag.y0) < 15) return;
     const rect = [drag.x0, drag.y0, drag.x1, drag.y1].map(v => v / k);
     drag = null;
+    if (!current.P) current.P = prepCanvas(current.canvas);
     const g = AG.gridFromRect(current.P, rect);
     let grids;
     if (g.red > 0.0005 && g.blue < 0.0005) grids = { right: g };
     else if (g.blue > 0.0005 && g.red < 0.0005) grids = { left: g };
     else grids = { right: g, left: g };
-    current.grids = grids;
-    current.data = AG.extract(current.P, grids, S);
-    showReview();
-    status("Vérifiez les points lus, puis Valider.", "ok");
+    const d = AG.extract(current.P, grids, S);
+    const it = { label: current.label, ...d, vocRight: [], vocLeft: [], canvas: current.canvas, grids, vgrid: null };
+    if (current.editIndex >= 0) { items[current.editIndex] = it; invalidate(); renderList(); refreshPreview(); status("Relu.", "ok"); }
+    else addItem(it);
+    current = null;
+    show("p-help");
   }
 
   // ------------------------------------------------------------ liste
@@ -983,12 +1163,15 @@ if (typeof module !== "undefined") module.exports = AG;
     const ul = $("list");
     ul.innerHTML = "";
     items.forEach((it, i) => {
-      const li = document.createElement("li");
-      li.innerHTML = `<span class="n">${i + 1}</span><span class="lb"></span>
+      const li = ul.ownerDocument.createElement("li");
+      li.innerHTML = `<span class="n">${i + 1}</span><input class="lb" title="Date ou libellé de l'examen">
         <span class="acts"><button title="Monter" data-a="up">▲</button><button title="Descendre" data-a="down">▼</button>
-        <button title="Modifier" data-a="edit">✎</button><button title="Supprimer" data-a="del">✕</button></span>`;
-      li.querySelector(".lb").textContent = it.label;
-      li.title = `OD : ${Object.keys(it.right).length} points · OG : ${Object.keys(it.left).length} points`;
+        <button title="Vérifier / modifier" data-a="edit">✎</button><button title="Supprimer" data-a="del">✕</button></span>`;
+      const inp = li.querySelector("input");
+      inp.value = it.label;
+      inp.oninput = () => { it.label = inp.value; invalidate(); schedulePreview(); };
+      inp.onkeydown = e => { if (e.key === "Enter") inp.blur(); };
+      li.title = `Aérienne OD ${nPts(it.right)} · OG ${nPts(it.left)} — osseuse OD ${nPts(it.boneRight)} · OG ${nPts(it.boneLeft)} — vocale OD ${it.vocRight.length} · OG ${it.vocLeft.length}`;
       li.querySelectorAll("button").forEach(b => b.onclick = () => listAction(b.dataset.a, i));
       ul.appendChild(li);
     });
@@ -1001,31 +1184,64 @@ if (typeof module !== "undefined") module.exports = AG;
     else if (a === "del") items.splice(i, 1);
     else if (a === "edit") {
       const it = items[i];
-      current = { canvas: it.canvas, P: prepCanvas(it.canvas), grids: it.grids,
-        data: { right: { ...it.right }, left: { ...it.left } }, label: it.label, editIndex: i };
-      showReview(); return;
+      current = { canvas: it.canvas, P: null, grids: it.grids, vgrid: it.vgrid, label: it.label, editIndex: i,
+        data: { right: { ...it.right }, left: { ...it.left }, boneRight: { ...it.boneRight }, boneLeft: { ...it.boneLeft },
+          vocRight: [...it.vocRight], vocLeft: [...it.vocLeft] } };
+      if (it.grids) showReview(); else openManual();
+      if (pip) { status("Vérification ouverte dans l'onglet principal.", "ok"); window.focus(); }
+      return;
     } else return;
-    invalidate(); renderList();
+    invalidate(); renderList(); refreshPreview();
   }
   function invalidate() {
     if (pdf && pdf.url) URL.revokeObjectURL(pdf.url);
     pdf = null;
-    $("btn-send").disabled = $("btn-dl").disabled = true;
+    $("btn-send").disabled = true;
+    document.getElementById("btn-dl").disabled = true;
   }
 
-  // ------------------------------------------------------------ page PDF
+  // ------------------------------------------------------------ dessin des graphiques
   function shade(ear, t) {
     const a = ear === "right" ? [252, 146, 114] : [158, 202, 225];
     const b = ear === "right" ? [103, 0, 13] : [8, 48, 107];
     return `rgb(${a.map((v, i) => Math.round(v + (b[i] - v) * t)).join(",")})`;
   }
   const flabel = f => (f >= 1000 ? `${f / 1000}k` : `${f}`);
-  // arrondi au dixième « au pair le plus proche », comme les audiomètres (63,75 → 63,8 ; 76,25 → 76,2)
   const round1 = v => { const x = v * 10, f = Math.floor(x), d = x - f;
     const r = Math.abs(d - 0.5) < 1e-9 ? (f % 2 === 0 ? f : f + 1) : Math.round(x); return r / 10; };
   const fmt = v => round1(v).toString().replace(".", ",");
+  const DASH = [[], [7, 4], [9, 3, 2, 3], [2, 3]];
+  const font = (c, k, sz, bold) => { c.font = `${bold ? "bold " : ""}${sz * k}px Helvetica, Arial, sans-serif`; };
 
-  function drawChart(c, k, x, y, w, h, ear, list, rng) {
+  function marker(c, kind, x, y, r, col) {
+    c.strokeStyle = col;
+    c.beginPath();
+    if (kind === "O") { c.fillStyle = "#fff"; c.arc(x, y, r, 0, 2 * Math.PI); c.fill(); c.stroke(); return; }
+    if (kind === "X") { c.moveTo(x - r, y - r); c.lineTo(x + r, y + r); c.moveTo(x - r, y + r); c.lineTo(x + r, y - r); }
+    if (kind === "[") { c.moveTo(x + r * 0.2, y - r); c.lineTo(x - r * 0.6, y - r); c.lineTo(x - r * 0.6, y + r); c.lineTo(x + r * 0.2, y + r); }
+    if (kind === "]") { c.moveTo(x - r * 0.2, y - r); c.lineTo(x + r * 0.6, y - r); c.lineTo(x + r * 0.6, y + r); c.lineTo(x - r * 0.2, y + r); }
+    c.stroke();
+  }
+
+  function drawLegend(c, k, x, y, entries) {
+    if (!entries.length) return;
+    const lh = 10.5 * k;
+    font(c, k, 7);
+    const lw = Math.max(...entries.map(e => c.measureText(e.label).width)) + 38 * k;
+    const by = y - lh * entries.length - 6 * k;
+    c.fillStyle = "rgba(255,255,255,.93)"; c.strokeStyle = "#bbb"; c.lineWidth = 0.6 * k;
+    c.fillRect(x, by, lw, lh * entries.length + 6 * k); c.strokeRect(x, by, lw, lh * entries.length + 6 * k);
+    c.textAlign = "left"; c.textBaseline = "middle";
+    entries.forEach((e, i) => {
+      const ly = by + 3 * k + lh * (i + 0.5);
+      c.strokeStyle = e.col; c.lineWidth = e.lw * k; c.setLineDash(e.dash.map(v => v * k));
+      c.beginPath(); c.moveTo(x + 5 * k, ly); c.lineTo(x + 27 * k, ly); c.stroke(); c.setLineDash([]);
+      c.lineWidth = 1.4 * k; marker(c, e.mk, x + 16 * k, ly, 3.2 * k, e.col);
+      c.fillStyle = "#222"; c.fillText(e.label, x + 33 * k, ly);
+    });
+  }
+
+  function drawChart(c, k, x, y, w, h, ear, list, rng, opts) {
     const { fmin, fmax, dbmin, dbmax } = rng;
     const L = Math.log(fmin / 1.25), R = Math.log(fmax * 1.25);
     const PX = f => x + ((Math.log(f) - L) / (R - L)) * w;
@@ -1034,8 +1250,7 @@ if (typeof module !== "undefined") module.exports = AG;
     c.fillStyle = "#fff"; c.fillRect(x, y, w, h);
     c.fillStyle = "#e8f5e9"; c.fillRect(x, y, w, PY(20) - y);
     c.strokeStyle = "#cfcfcf"; c.lineWidth = 0.6 * k;
-    c.font = `${7.5 * k}px Helvetica, Arial, sans-serif`; c.fillStyle = "#333";
-    c.textAlign = "center"; c.textBaseline = "top";
+    font(c, k, 7.5); c.fillStyle = "#333"; c.textAlign = "center"; c.textBaseline = "top";
     for (const f of AG.STD) {
       if (f < fmin || f > fmax) continue;
       c.beginPath(); c.moveTo(PX(f), y); c.lineTo(PX(f), y + h); c.stroke();
@@ -1048,89 +1263,79 @@ if (typeof module !== "undefined") module.exports = AG;
     }
     c.strokeStyle = "#555"; c.lineWidth = 0.8 * k; c.strokeRect(x, y, w, h);
     c.textAlign = "center"; c.textBaseline = "alphabetic";
-    c.font = `bold ${12 * k}px Helvetica, Arial, sans-serif`; c.fillStyle = EAR_COL[ear];
-    c.fillText(EAR_NAME[ear], x + w / 2, y - 7 * k);
-    c.font = `${8 * k}px Helvetica, Arial, sans-serif`; c.fillStyle = "#333";
+    font(c, k, 12, true); c.fillStyle = EAR_COL[ear];
+    const what = opts.air && opts.bone ? " — aérienne et osseuse" : opts.bone ? " — conduction osseuse" : "";
+    c.fillText(EAR_NAME[ear] + what, x + w / 2, y - 7 * k);
+    font(c, k, 8); c.fillStyle = "#333";
     c.fillText("Fréquence (Hz)", x + w / 2, y + h + 20 * k);
 
-    const dashes = [[], [7, 4], [9, 3, 2, 3], [2, 3]];
-    const n = list.length, ms = 3.6 * k;
-    const legend = [];
+    const n = list.length, legend = [];
+    const both = opts.air && opts.bone;
     list.forEach((a, i) => {
-      const v = a[ear], fs = Object.keys(v).map(Number).sort((p, q) => p - q);
-      if (!fs.length) return;
-      const col = shade(ear, n > 1 ? i / (n - 1) : 1), dash = dashes[i % 4].map(d => d * k);
-      c.save();
-      c.strokeStyle = col; c.lineWidth = 1.8 * k; c.setLineDash(dash);
-      c.beginPath(); fs.forEach((f, j) => (j ? c.lineTo : c.moveTo).call(c, PX(f), PY(v[f]))); c.stroke();
-      c.setLineDash([]); c.lineWidth = 1.6 * k;
-      for (const f of fs) marker(c, ear, PX(f), PY(v[f]), ms, col);
-      c.restore();
-      legend.push([a.label, col, dash]);
+      const col = shade(ear, n > 1 ? i / (n - 1) : 1);
+      const series = [];
+      if (opts.air) series.push({ v: a[ear], mk: ear === "right" ? "O" : "X", dash: both ? [] : DASH[i % 4], lw: 1.8, kind: "CA" });
+      if (opts.bone) series.push({ v: a[BONE[ear]] || {}, mk: ear === "right" ? "[" : "]", dash: both ? [2, 2.5] : DASH[i % 4], lw: both ? 1.2 : 1.8, kind: "CO" });
+      for (const sr of series) {
+        const fs = Object.keys(sr.v).map(Number).sort((p, q) => p - q);
+        if (!fs.length) continue;
+        c.save();
+        c.strokeStyle = col; c.lineWidth = sr.lw * k; c.setLineDash(sr.dash.map(d => d * k));
+        c.beginPath(); fs.forEach((f, j) => (j ? c.lineTo : c.moveTo).call(c, PX(f), PY(sr.v[f]))); c.stroke();
+        c.setLineDash([]); c.lineWidth = 1.6 * k;
+        for (const f of fs) marker(c, sr.mk, PX(f), PY(sr.v[f]), 3.6 * k, col);
+        c.restore();
+        legend.push({ label: a.label + (both ? (sr.kind === "CA" ? " (aérienne)" : " (osseuse)") : ""), col, dash: sr.dash, lw: sr.lw, mk: sr.mk });
+      }
     });
+    drawLegend(c, k, x + 6 * k, y + h - 6 * k, legend);
+  }
+
+  function drawVocale(c, k, x, y, w, h, list) {
+    const PX = d => x + ((d + 10) / 130) * w, PY = p => y + h - (p / 100) * h;
+    c.fillStyle = "#fff"; c.fillRect(x, y, w, h);
+    c.strokeStyle = "#d4d4d4"; c.lineWidth = 0.6 * k;
+    font(c, k, 7.5); c.fillStyle = "#333";
+    c.textAlign = "center"; c.textBaseline = "top";
+    for (let d = -10; d <= 120; d += 10) { c.beginPath(); c.moveTo(PX(d), y); c.lineTo(PX(d), y + h); c.stroke(); c.fillText(String(d), PX(d), y + h + 4 * k); }
+    c.textAlign = "right"; c.textBaseline = "middle";
+    for (let p = 0; p <= 100; p += 10) { c.beginPath(); c.moveTo(x, PY(p)); c.lineTo(x + w, PY(p)); c.stroke(); c.fillText(String(p), x - 4 * k, PY(p)); }
+    c.strokeStyle = "#888"; c.lineWidth = 0.9 * k; c.beginPath(); c.moveTo(x, PY(50)); c.lineTo(x + w, PY(50)); c.stroke();
+    c.strokeStyle = "#555"; c.lineWidth = 0.8 * k; c.strokeRect(x, y, w, h);
+    c.textAlign = "center"; c.textBaseline = "alphabetic";
+    font(c, k, 12, true); c.fillStyle = "#333"; c.fillText("Audiométrie vocale", x + w / 2, y - 7 * k);
+    font(c, k, 8); c.fillText("Intensité (dB)", x + w / 2, y + h + 20 * k);
+    c.save(); c.translate(x - 24 * k, y + h / 2); c.rotate(-Math.PI / 2); c.fillText("Intelligibilité (%)", 0, 0); c.restore();
+    const n = list.length, legend = [];
+    list.forEach((a, i) => {
+      for (const ear of AG.EARS) {
+        const pts = a[VOC[ear]] || [];
+        if (!pts.length) continue;
+        const col = shade(ear, n > 1 ? i / (n - 1) : 1), dash = DASH[i % 4], mk = ear === "right" ? "O" : "X";
+        c.save();
+        c.strokeStyle = col; c.lineWidth = 1.6 * k; c.setLineDash(dash.map(d => d * k));
+        c.beginPath(); pts.forEach(([d, p], j) => (j ? c.lineTo : c.moveTo).call(c, PX(d), PY(p))); c.stroke();
+        c.setLineDash([]); c.lineWidth = 1.5 * k;
+        for (const [d, p] of pts) marker(c, mk, PX(d), PY(p), 3.4 * k, col);
+        c.restore();
+        legend.push({ label: `${a.label} ${ear === "right" ? "OD" : "OG"}`, col, dash, lw: 1.6, mk });
+      }
+    });
+    // légende en haut à gauche (zone en général vide : courbes à droite)
     if (legend.length) {
-      const lh = 11 * k, lw = 105 * k, bx = x + 6 * k, by = y + h - 6 * k - lh * legend.length - 6 * k;
-      c.fillStyle = "rgba(255,255,255,.92)"; c.strokeStyle = "#bbb"; c.lineWidth = 0.6 * k;
-      c.fillRect(bx, by, lw, lh * legend.length + 6 * k); c.strokeRect(bx, by, lw, lh * legend.length + 6 * k);
-      c.font = `${7.5 * k}px Helvetica, Arial, sans-serif`; c.textAlign = "left"; c.textBaseline = "middle";
-      legend.forEach(([lab, col, dash], i) => {
-        const ly = by + 3 * k + lh * (i + 0.5);
-        c.strokeStyle = col; c.lineWidth = 1.8 * k; c.setLineDash(dash);
-        c.beginPath(); c.moveTo(bx + 5 * k, ly); c.lineTo(bx + 27 * k, ly); c.stroke(); c.setLineDash([]);
-        c.lineWidth = 1.4 * k; marker(c, ear, bx + 16 * k, ly, ms * 0.9, col);
-        c.fillStyle = "#222"; c.fillText(lab, bx + 33 * k, ly);
-      });
-    }
-  }
-  function marker(c, ear, x, y, r, col) {
-    c.strokeStyle = col;
-    if (ear === "right") {
-      c.fillStyle = "#fff"; c.beginPath(); c.arc(x, y, r, 0, 2 * Math.PI); c.fill(); c.stroke();
-    } else {
-      c.beginPath(); c.moveTo(x - r, y - r); c.lineTo(x + r, y + r); c.moveTo(x - r, y + r); c.lineTo(x + r, y - r); c.stroke();
+      const save = y + 6 * k + 10.5 * k * legend.length + 6 * k;
+      drawLegend(c, k, x + 6 * k, save, legend);
     }
   }
 
-  function renderPage(list, patient) {
-    const k = 200 / 72;                         // 200 dpi
-    const cv = document.createElement("canvas");
-    cv.width = Math.round(842 * k); cv.height = Math.round(595 * k);
-    const c = cv.getContext("2d");
-    c.fillStyle = "#fff"; c.fillRect(0, 0, cv.width, cv.height);
-    const allv = list.flatMap(a => AG.EARS.flatMap(e => Object.values(a[e])));
-    const allf = [...new Set(list.flatMap(a => AG.EARS.flatMap(e => Object.keys(a[e]).map(Number))))].sort((p, q) => p - q);
-    const rng = { fmin: Math.min(125, ...allf), fmax: Math.max(8000, ...allf),
-      dbmin: Math.min(-10, ...allv), dbmax: Math.max(120, ...allv) };
-    c.textAlign = "center"; c.fillStyle = "#111";
-    c.font = `bold ${16 * k}px Helvetica, Arial, sans-serif`;
-    c.fillText("Audiogrammes superposés" + (patient ? " — " + patient : ""), cv.width / 2, 28 * k);
-    c.font = `${8.5 * k}px Helvetica, Arial, sans-serif`; c.fillStyle = "#666";
-    const today = new Date().toLocaleDateString("fr-FR");
-    c.fillText(`${list.length} examen(s) — du plus ancien (clair) au plus récent (foncé) — édité le ${today}`, cv.width / 2, 42 * k);
-
-    const ch = 255;
-    drawChart(c, k, 62 * k, 66 * k, 330 * k, ch * k, "right", list, rng);
-    drawChart(c, k, 470 * k, 66 * k, 330 * k, ch * k, "left", list, rng);
-    c.save(); c.translate(26 * k, (66 + ch / 2) * k); c.rotate(-Math.PI / 2);
-    c.font = `${8 * k}px Helvetica, Arial, sans-serif`; c.fillStyle = "#333"; c.textAlign = "center";
-    c.fillText("Seuil (dB HL)", 0, 0); c.restore();
-    c.save(); c.translate(434 * k, (66 + ch / 2) * k); c.rotate(-Math.PI / 2);
-    c.fillText("Seuil (dB HL)", 0, 0); c.restore();
-
-    // tableau
-    const rows = [];
-    for (const a of list) for (const e of AG.EARS) {
-      if (!Object.keys(a[e]).length) continue;
-      const p = AG.pta(a[e]);
-      rows.push({ e, cells: [a.label, e === "right" ? "OD" : "OG", ...allf.map(f => (a[e][f] == null ? "–" : fmt(a[e][f]))), p == null ? "–" : fmt(p)] });
-    }
-    const head = ["Examen", "Oreille", ...allf.map(flabel), "Perte moy."];
-    const tx = 30 * k, tw = 782 * k, ty = 368 * k;
-    const avail = 560 * k - ty;
-    const rh = Math.min(15 * k, avail / (rows.length + 1));
-    const w0 = 110 * k, w1 = 42 * k, wl = 60 * k, wf = (tw - w0 - w1 - wl) / Math.max(1, allf.length);
-    const widths = [w0, w1, ...allf.map(() => wf), wl];
-    const fs = Math.min(8 * k, rh * 0.6);
+  function drawTable(c, k, tx, ty, tw, maxH, head, rows, widthsFirst) {
+    if (!rows.length) return;
+    const rh = Math.min(14 * k, maxH / (rows.length + 1));
+    const fixed = widthsFirst.reduce((a, b) => a + b, 0) * k;
+    const rest = head.length - widthsFirst.length;
+    const wf = (tw - fixed) / Math.max(1, rest);
+    const widths = head.map((_, i) => (i < widthsFirst.length ? widthsFirst[i] * k : wf));
+    const fs = Math.min(7.5 * k, rh * 0.62);
     const drawRow = (cells, yy, bg, bold) => {
       let xx = tx;
       cells.forEach((t, i) => {
@@ -1138,19 +1343,92 @@ if (typeof module !== "undefined") module.exports = AG;
         c.strokeStyle = "#bbb"; c.lineWidth = 0.5 * k; c.strokeRect(xx, yy, widths[i], rh);
         c.fillStyle = "#222"; c.font = `${bold ? "bold " : ""}${fs}px Helvetica, Arial, sans-serif`;
         c.textAlign = "center"; c.textBaseline = "middle";
-        c.fillText(t, xx + widths[i] / 2, yy + rh / 2, widths[i] - 4);
+        c.fillText(t, xx + widths[i] / 2, yy + rh / 2, widths[i] - 3);
         xx += widths[i];
       });
     };
     drawRow(head, ty, "#eeeeee", true);
-    rows.forEach((r, i) => drawRow(r.cells, ty + rh * (i + 1), r.e === "right" ? "#fdecea" : "#e8f0fd", false));
-    c.textAlign = "left"; c.textBaseline = "alphabetic"; c.fillStyle = "#777";
-    c.font = `${6.5 * k}px Helvetica, Arial, sans-serif`;
-    c.fillText("Perte moyenne : moyenne des seuils à 500, 1000, 2000 et 4000 Hz (BIAP). Valeurs lues automatiquement à l'écran puis validées.",
-      tx, 583 * k);
-    const text = ["Audiogrammes superposés" + (patient ? " - " + patient : ""), `Édité le ${today}`,
-      head.join(" | "), ...rows.map(r => r.cells.join(" | "))];
+    rows.forEach((r, i) => drawRow(r.cells, ty + rh * (i + 1), r.bg, false));
+  }
+
+  function renderPage(list, patient, opts, k = 200 / 72) {
+    const cv = document.createElement("canvas");
+    cv.width = Math.round(842 * k); cv.height = Math.round(595 * k);
+    const c = cv.getContext("2d");
+    c.fillStyle = "#fff"; c.fillRect(0, 0, cv.width, cv.height);
+    const A = opts.air || opts.bone, V = opts.voc;
+    const keys = [...(opts.air ? ["right", "left"] : []), ...(opts.bone ? ["boneRight", "boneLeft"] : [])];
+    const allv = list.flatMap(a => keys.flatMap(e => Object.values(a[e] || {})));
+    const allf = [...new Set(list.flatMap(a => keys.flatMap(e => Object.keys(a[e] || {}).map(Number))))].sort((p, q) => p - q);
+    const rng = { fmin: Math.min(125, ...allf), fmax: Math.max(8000, ...allf), dbmin: Math.min(-10, ...allv), dbmax: Math.max(120, ...allv) };
+    c.textAlign = "center"; c.fillStyle = "#111";
+    font(c, k, 16, true);
+    c.fillText("Audiogrammes superposés" + (patient ? " — " + patient : ""), cv.width / 2, 26 * k);
+    font(c, k, 8.5); c.fillStyle = "#666";
+    const today = new Date().toLocaleDateString("fr-FR");
+    const shown = [opts.air && "aérienne", opts.bone && "osseuse", opts.voc && "vocale"].filter(Boolean).join(", ") || "aucune courbe";
+    c.fillText(`${list.length} examen(s) — ${shown} — du plus ancien (clair) au plus récent (foncé) — édité le ${today}`, cv.width / 2, 39 * k);
+
+    // tableau des seuils
+    const rows = [];
+    for (const a of list) for (const e of AG.EARS) for (const [on, key, typ] of [[opts.air, e, "CA"], [opts.bone, BONE[e], "CO"]]) {
+      const v = a[key] || {};
+      if (!on || !nPts(v)) continue;
+      const p = AG.pta(v);
+      rows.push({ bg: e === "right" ? (typ === "CA" ? "#fdecea" : "#fbf3f2") : (typ === "CA" ? "#e8f0fd" : "#f2f6fd"),
+        cells: [a.label, e === "right" ? "OD" : "OG", typ, ...allf.map(f => (v[f] == null ? "–" : fmt(v[f]))), p == null ? "–" : fmt(p)] });
+    }
+    const head = ["Examen", "Or.", "", ...allf.map(flabel), "Perte moy."];
+    const text = ["Audiogrammes superposés" + (patient ? " - " + patient : ""), `Édité le ${today}`, head.join(" | "), ...rows.map(r => r.cells.join(" | "))];
+
+    if (A && !V) {
+      drawChart(c, k, 62 * k, 66 * k, 330 * k, 255 * k, "right", list, rng, opts);
+      drawChart(c, k, 470 * k, 66 * k, 330 * k, 255 * k, "left", list, rng, opts);
+      yLabel(c, k, 26, 66 + 127); yLabel(c, k, 434, 66 + 127);
+      drawTable(c, k, 30 * k, 366 * k, 782 * k, 190 * k, head, rows, [100, 26, 24]);
+    } else if (A && V) {
+      drawChart(c, k, 62 * k, 62 * k, 330 * k, 196 * k, "right", list, rng, opts);
+      drawChart(c, k, 470 * k, 62 * k, 330 * k, 196 * k, "left", list, rng, opts);
+      yLabel(c, k, 26, 62 + 98); yLabel(c, k, 434, 62 + 98);
+      drawVocale(c, k, 62 * k, 312 * k, 330 * k, 196 * k, list);
+      drawTable(c, k, 430 * k, 312 * k, 382 * k, 240 * k, head, rows, [70, 20, 20]);
+    } else if (V) {
+      drawVocale(c, k, 110 * k, 66 * k, 622 * k, 330 * k, list);
+      const vr = [];
+      for (const a of list) for (const e of AG.EARS) {
+        const pts = a[VOC[e]] || [];
+        if (pts.length) vr.push({ bg: e === "right" ? "#fdecea" : "#e8f0fd", cells: [a.label, e === "right" ? "OD" : "OG", pts.map(([d, p]) => `${d} dB : ${p} %`).join("   ")] });
+      }
+      drawTable(c, k, 30 * k, 440 * k, 782 * k, 120 * k, ["Examen", "Or.", "Audiométrie vocale"], vr, [110, 30]);
+      for (const r of vr) text.push(r.cells.join(" | "));
+    } else {
+      font(c, k, 12); c.fillStyle = "#999"; c.fillText("Cochez au moins une courbe : aérienne, osseuse ou vocale.", cv.width / 2, cv.height / 2);
+    }
+    if (V && A) for (const a of list) for (const e of AG.EARS) {
+      const pts = a[VOC[e]] || [];
+      if (pts.length) text.push(`${a.label} | ${e === "right" ? "OD" : "OG"} | vocale | ` + pts.map(([d, p]) => `${d} dB: ${p} %`).join(", "));
+    }
+    c.textAlign = "left"; c.textBaseline = "alphabetic"; c.fillStyle = "#777"; font(c, k, 6.5);
+    c.fillText("CA = conduction aérienne, CO = conduction osseuse. Perte moyenne : moyenne 500, 1000, 2000 et 4000 Hz (BIAP). Valeurs lues automatiquement à l'écran.",
+      30 * k, 584 * k);
     return { canvas: cv, text };
+  }
+  function yLabel(c, k, x, y) {
+    c.save(); c.translate(x * k, y * k); c.rotate(-Math.PI / 2);
+    font(c, k, 8); c.fillStyle = "#333"; c.textAlign = "center"; c.fillText("Seuil (dB HL)", 0, 0); c.restore();
+  }
+
+  const opts = () => ({ air: !!S.show_air, bone: !!S.show_bone, voc: !!S.show_voc });
+
+  // aperçu permanent dans la fenêtre de commande
+  let prevTimer = null;
+  function schedulePreview() { clearTimeout(prevTimer); prevTimer = setTimeout(refreshPreview, 250); }
+  function refreshPreview() {
+    const box = $("mini");
+    if (!items.length) { box.hidden = true; return; }
+    const { canvas } = renderPage(items, $("patient").value.trim(), opts(), 1.7);
+    $("mini-img").src = canvas.toDataURL("image/png");
+    box.hidden = false;
   }
 
   // ------------------------------------------------------------ écriture PDF (sans bibliothèque)
@@ -1190,20 +1468,21 @@ if (typeof module !== "undefined") module.exports = AG;
     if (!items.length) return;
     status("Création du PDF…", "busy");
     const patient = $("patient").value.trim();
-    const { canvas, text } = renderPage(items, patient);
+    const { canvas, text } = renderPage(items, patient, opts());
     const jpegBlob = await new Promise(r => canvas.toBlob(r, "image/jpeg", 0.92));
     const jpeg = new Uint8Array(await jpegBlob.arrayBuffer());
-    const title = "Audiogrammes superposés" + (patient ? " - " + patient : "");
-    const blob = buildPdf(jpeg, canvas.width, canvas.height, title, text);
+    const blob = buildPdf(jpeg, canvas.width, canvas.height, "Audiogrammes superposés" + (patient ? " - " + patient : ""), text);
     const d = new Date(), p2 = n => String(n).padStart(2, "0");
     const name = `Audiogrammes_superposes_${safeName(patient) || "patient"}_${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}_${p2(d.getHours())}h${p2(d.getMinutes())}.pdf`;
     invalidate();
     pdf = { blob, name, url: URL.createObjectURL(blob) };
-    $("res-img").src = canvas.toDataURL("image/jpeg", 0.85);
-    $("res-name").textContent = name;
+    document.getElementById("res-img").src = canvas.toDataURL("image/jpeg", 0.85);
+    document.getElementById("res-name").textContent = name;
+    document.getElementById("res-sent").hidden = true;
     show("p-result");
-    $("btn-send").disabled = $("btn-dl").disabled = false;
-    status("PDF prêt. Vérifiez-le, puis cliquez sur Envoyer vers Doctolib.", "ok");
+    $("btn-send").disabled = false;
+    document.getElementById("btn-dl").disabled = false;
+    status("PDF prêt. Cliquez sur Envoyer vers Doctolib.", "ok");
   }
 
   function download() {
@@ -1213,44 +1492,80 @@ if (typeof module !== "undefined") module.exports = AG;
   }
 
   async function chooseFolder() {
-    if (!window.showDirectoryPicker) { status("Ce navigateur ne permet pas d'écrire dans un dossier : utilisez Télécharger.", "err"); return null; }
+    const w = pip || window;
+    if (!w.showDirectoryPicker) { status("Ce navigateur ne permet pas d'écrire dans un dossier : utilisez Télécharger.", "err"); return null; }
     try {
-      dirHandle = await window.showDirectoryPicker({ id: "doctolib", mode: "readwrite" });
+      dirHandle = await w.showDirectoryPicker({ id: "doctolib", mode: "readwrite" });
       await idbSet("dir", dirHandle);
       showFolder();
       return dirHandle;
     } catch (e) { return null; }
   }
-  function showFolder() { $("folder").textContent = dirHandle ? dirHandle.name : "pas encore choisi"; }
+  function showFolder() { $("folder").textContent = dirHandle ? dirHandle.name || "choisi" : "pas encore choisi"; }
 
   async function send() {
+    if (!pdf) await superpose();
     if (!pdf) return;
     if (!window.showDirectoryPicker) { download(); status("PDF téléchargé : glissez-le dans le dossier d'import Doctolib.", "ok"); return; }
-    let h = dirHandle || await chooseFolder();
+    const h = dirHandle || await chooseFolder();
     if (!h) { status("Choisissez le dossier d'import (passerelle) Doctolib.", "err"); return; }
     try {
       let perm = await h.queryPermission({ mode: "readwrite" });
       if (perm !== "granted") perm = await h.requestPermission({ mode: "readwrite" });
-      if (perm !== "granted") { status("Chrome n'a pas reçu l'autorisation d'écrire dans le dossier.", "err"); return; }
+      if (perm !== "granted") { status("Chrome n'a pas l'autorisation d'écrire dans le dossier.", "err"); return; }
       const fh = await h.getFileHandle(pdf.name, { create: true });
       const w = await fh.createWritable();
       await w.write(pdf.blob); await w.close();
-    } catch (e) { status("Envoi impossible : " + e.message, "err"); return; }
+    } catch (e) {
+      status(pip ? "Chrome demande d'autoriser le dossier : cliquez une fois sur Envoyer dans l'onglet principal (↩), ensuite ça marchera ici."
+        : "Envoi impossible : " + e.message, "err");
+      return;
+    }
     status(`✔ Envoyé dans le dossier Doctolib « ${h.name} » : ${pdf.name}`, "ok");
-    $("res-sent").hidden = false;
+    document.getElementById("res-sent").hidden = false;
   }
 
   function newPatient() {
-    if (items.length && !window.__noConfirm && !confirm("Effacer la liste et passer au patient suivant ?")) return;
-    items = []; $("patient").value = ""; invalidate(); renderList(); show("p-help");
-    $("res-sent").hidden = true;
+    const w = pip || window;
+    if (items.length && !window.__noConfirm && !w.confirm("Effacer la liste et passer au patient suivant ?")) return;
+    items = []; $("patient").value = ""; invalidate(); renderList(); refreshPreview(); show("p-help");
     status("Nouveau patient : affichez le premier audiogramme puis cliquez sur Capturer.", "");
   }
+
+  // ------------------------------------------------------------ fenêtre flottante
+  async function openPip() {
+    if (pip) return;
+    if (!("documentPictureInPicture" in window)) {
+      status("Cette version de Chrome ne propose pas la fenêtre flottante (Chrome 116 ou plus récent requis).", "err");
+      return;
+    }
+    try {
+      pip = await documentPictureInPicture.requestWindow({ width: 380, height: 760 });
+    } catch (e) { status("Fenêtre flottante refusée : " + e.message, "err"); pip = null; return; }
+    for (const st of document.querySelectorAll("style")) pip.document.head.appendChild(st.cloneNode(true));
+    pip.document.title = "Audiogrammes";
+    pip.document.body.classList.add("pip");
+    const aside = document.getElementById("aside");
+    pip.document.body.appendChild(aside);
+    document.body.classList.add("pip-open");
+    const th = $("thumb"); if (stream) { th.srcObject = stream; th.play().catch(() => {}); }
+    pip.document.addEventListener("paste", onPaste);
+    pip.addEventListener("pagehide", () => {
+      const a = pip.document.getElementById("aside");
+      document.querySelector(".wrap").prepend(a);
+      pip = null;
+      document.body.classList.remove("pip-open");
+      const t = document.getElementById("thumb"); if (stream) { t.srcObject = stream; t.play().catch(() => {}); }
+    });
+    status("Fenêtre flottante ouverte : elle reste au-dessus de Doctolib.", "ok");
+  }
+  function closePip() { if (pip) pip.close(); }
 
   // ------------------------------------------------------------ paramètres
   function syncSettingsForm() {
     for (const k of ["db_bottom", "db_step"]) $("st-" + k).value = S[k];
     $("st-round").checked = !!S.round_5;
+    $("show-air").checked = !!S.show_air; $("show-bone").checked = !!S.show_bone; $("show-voc").checked = !!S.show_voc;
   }
   function saveSettingsForm() {
     for (const k of ["db_bottom", "db_step"]) {
@@ -1259,32 +1574,43 @@ if (typeof module !== "undefined") module.exports = AG;
     S.round_5 = $("st-round").checked; saveS();
     status("Paramètres enregistrés.", "ok");
   }
+  function onShowChange() {
+    S.show_air = $("show-air").checked; S.show_bone = $("show-bone").checked; S.show_voc = $("show-voc").checked;
+    saveS(); invalidate(); refreshPreview();
+    if (!document.getElementById("p-result").hidden && items.length) superpose();
+  }
+  function onPaste(e) {
+    for (const it of e.clipboardData.items) if (it.type.startsWith("image/")) { importBlob(it.getAsFile()); e.preventDefault(); return; }
+  }
 
   // ------------------------------------------------------------ branchements
   $("btn-share").onclick = shareScreen;
   $("btn-capture").onclick = capture;
   $("btn-sup").onclick = superpose;
   $("btn-send").onclick = send;
-  $("btn-dl").onclick = download;
-  $("btn-open").onclick = () => pdf && window.open(pdf.url, "_blank");
   $("btn-folder").onclick = chooseFolder;
   $("btn-new").onclick = newPatient;
-  $("btn-new2").onclick = newPatient;
-  $("rv-ok").onclick = validate;
-  $("rv-cancel").onclick = () => { current = null; show("p-help"); status("Annulé.", ""); };
-  $("rv-manual").onclick = () => { current.label = $("rv-label").value; openManual(); };
-  $("rv-reread").onclick = reread;
-  $("mn-cancel").onclick = () => { current = null; show("p-help"); status("Annulé.", ""); };
+  $("btn-pip").onclick = openPip;
+  $("btn-unpip").onclick = closePip;
   $("st-save").onclick = saveSettingsForm;
+  for (const id of ["show-air", "show-bone", "show-voc"]) $(id).onchange = onShowChange;
+  $("patient").oninput = () => { invalidate(); schedulePreview(); };
+  $("mini-img").onclick = () => { superpose(); if (pip) window.focus(); };
   $("file").onchange = e => { const f = e.target.files[0]; if (f) importBlob(f); e.target.value = ""; };
-  $("p-review").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); validate(); } });
-  const mn = $("mn");
+  const g = id => document.getElementById(id);
+  g("btn-dl").onclick = download;
+  g("btn-open").onclick = () => pdf && window.open(pdf.url, "_blank");
+  g("btn-new2").onclick = newPatient;
+  g("rv-ok").onclick = saveReview;
+  g("rv-cancel").onclick = () => { current = null; show("p-help"); status("Annulé.", ""); };
+  g("rv-manual").onclick = () => { current.label = g("rv-label").value; openManual(); };
+  g("rv-reread").onclick = reread;
+  g("mn-cancel").onclick = () => { current = null; show("p-help"); status("Annulé.", ""); };
+  const mn = g("mn");
   mn.onmousedown = e => { const [x, y] = mpos(e); drag = { x0: x, y0: y, x1: null, y1: null }; };
   mn.onmousemove = e => { if (!drag) return; [drag.x1, drag.y1] = mpos(e); redrawManual(); };
   window.addEventListener("mouseup", () => { if (drag && drag.x1 != null) manualDone(); else drag = null; });
-  document.addEventListener("paste", e => {
-    for (const it of e.clipboardData.items) if (it.type.startsWith("image/")) { importBlob(it.getAsFile()); e.preventDefault(); return; }
-  });
+  document.addEventListener("paste", onPaste);
   document.addEventListener("dragover", e => e.preventDefault());
   document.addEventListener("drop", e => {
     e.preventDefault();
@@ -1293,9 +1619,9 @@ if (typeof module !== "undefined") module.exports = AG;
   });
 
   idbGet("dir").then(h => { if (h) dirHandle = h; showFolder(); });
-  syncSettingsForm(); renderList(); updateSource(); show("p-help");
-  window.__app = { importBlob, superpose, send, validate, get items() { return items; }, get pdf() { return pdf; },
-    setDir(h) { dirHandle = h; showFolder(); }, processCanvas };
+  syncSettingsForm(); renderList(); updateSource(""); show("p-help");
+  window.__app = { importBlob, superpose, send, openPip, get items() { return items; }, get pdf() { return pdf; },
+    get pip() { return pip; }, setDir(h) { dirHandle = h; showFolder(); }, processCanvas };
 })();
 
 </script>
