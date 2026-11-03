@@ -141,7 +141,7 @@
     <div class="step">1 · Dossier des téléchargements</div>
     <div class="watch"><span id="watch-dot" class="dot off"></span><span>Surveillé : <b id="watch-name">aucun</b></span>
       <button id="btn-resume" hidden>▶ Reprendre</button><button id="btn-watch">Choisir le dossier…</button></div>
-    <p class="hint">Les PDF d'audiogramme qui y arrivent sont importés tout seuls. Ou glissez-les ici,
+    <p class="hint">Les PDF d'audiogramme qui y arrivent sont importés puis effacés du dossier, tout seuls. Ou glissez-les ici,
       <label class="lnk">choisir des fichiers<input type="file" id="file" accept="application/pdf,.pdf" multiple hidden></label>.</p>
   </div>
 
@@ -188,7 +188,8 @@
     <ol>
       <li><b>Une seule fois</b> : créez un dossier <b>Audiogrammes</b> dans Téléchargements et réglez Chrome (et Doctolib) pour y
         télécharger, puis cliquez sur « Choisir le dossier… ». Chrome n'autorise pas une page web à surveiller Téléchargements lui-même.</li>
-      <li>Téléchargez les audiogrammes du patient : ils sont lus et ajoutés tout seuls (patient, date, aérienne, osseuse, vocale).</li>
+      <li>Téléchargez les audiogrammes du patient : ils sont lus et ajoutés tout seuls (patient, date, aérienne, osseuse, vocale),
+        puis effacés du dossier de téléchargement. Les autres fichiers du dossier ne sont jamais touchés.</li>
       <li>Cochez les courbes à afficher, puis <b>Envoyer vers Doctolib</b>.</li>
     </ol>
     <div class="tip">Rien ne quitte votre ordinateur : la lecture et le PDF se font dans Chrome.</div>
@@ -948,6 +949,7 @@ if (typeof module !== "undefined") module.exports = AG;
       pdfjs.GlobalWorkerOptions.workerSrc = PDFJS.worker;
       const doc = await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
       const pages = Math.min(doc.numPages, 4);
+      let ok = false;
       for (let n = 1; n <= pages; n++) {
         const page = await doc.getPage(n);
         const vp = page.getViewport({ scale: 150 / 72 });
@@ -955,9 +957,10 @@ if (typeof module !== "undefined") module.exports = AG;
         cv.width = Math.round(vp.width); cv.height = Math.round(vp.height);
         const ctx = cv.getContext("2d"); ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, cv.width, cv.height);
         await page.render({ canvasContext: ctx, viewport: vp }).promise;
-        await processCanvas(cv, { fileName: file.name || "", auto });
+        if (await processCanvas(cv, { fileName: file.name || "", auto })) ok = true;
       }
-    } catch (e) { status("PDF illisible : " + e.message, "err"); }
+      return ok;
+    } catch (e) { status("PDF illisible : " + e.message, "err"); return false; }
   }
   const prepCanvas = cv => AG.prep(cv.getContext("2d", { willReadFrequently: true }).getImageData(0, 0, cv.width, cv.height));
 
@@ -972,8 +975,9 @@ if (typeof module !== "undefined") module.exports = AG;
   let queue = Promise.resolve(), busy = 0;
   function processCanvas(cv, meta) {
     busy++;
-    queue = queue.then(() => processOne(cv, meta || {})).catch(e => status("Erreur de lecture : " + e.message, "err")).finally(() => { busy--; });
-    return queue;
+    const job = queue.then(() => processOne(cv, meta || {})).catch(e => { status("Erreur de lecture : " + e.message, "err"); return false; });
+    queue = job.finally(() => { busy--; });
+    return job;
   }
   async function processOne(cv, meta) {
     status("Lecture de l'audiogramme…", "busy");
@@ -982,10 +986,10 @@ if (typeof module !== "undefined") module.exports = AG;
     res.canvas = cv;
     const data = res.data || { right: {}, left: {}, boneRight: {}, boneLeft: {}, vocRight: [], vocLeft: [] };
     if (!hasAir(data) && !hasVoc(data)) {
-      if (meta.auto) { status(`${meta.fileName} : pas d'audiogramme reconnu, ignoré.`, ""); return; }
+      if (meta.auto) { status(`${meta.fileName} : pas d'audiogramme reconnu, ignoré.`, ""); return false; }
       current = { canvas: cv, P: null, grids: null, data: null, vgrid: null, label: `Examen ${items.length + 1}`, editIndex: -1 };
       openManual("Je n'ai pas trouvé d'audiogramme lisible. Encadrez la grille à la souris.");
-      return;
+      return false;
     }
     // nom et date : d'abord dans le nom du fichier (NOM_PRENOM_Audiogramme_AAAA-MM-JJ.pdf), sinon lus sur la page
     let info = OCR.parse((meta.fileName || "").replace(/\.pdf$/i, ""));
@@ -993,7 +997,7 @@ if (typeof module !== "undefined") module.exports = AG;
       status("Lecture du nom et de la date…", "busy");
       try { const o = await OCR.read(res.canvas || cv, res.grids); info = { name: info.name || o.name, date: info.date || o.date }; } catch (e) {}
     }
-    place({ ...data, canvas: res.canvas || cv, grids: res.grids, vgrid: res.vgridV || res.vgrid, vcanvas: res.vcanvas || res.canvas || cv }, info);
+    return place({ ...data, canvas: res.canvas || cv, grids: res.grids, vgrid: res.vgridV || res.vgrid, vcanvas: res.vcanvas || res.canvas || cv }, info);
   }
 
   const normName = s => (s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().replace(/[^A-Z]/g, "");
@@ -1026,12 +1030,13 @@ if (typeof module !== "undefined") module.exports = AG;
       invalidate(); sortItems(); renderList(); refreshPreview();
       status((added.length ? `✔ ${last.label} complété (${added.map(k => k === "vocale" ? "vocale" : k.startsWith("bone") ? "osseuse" : "aérienne").join(", ")}).`
         : `${last.label} : déjà importé.`) + warn, "ok");
-      return;
+      return true;
     }
     it.date = info.date || null;
     it.label = info.date || `Examen ${items.length + 1}`;
     it.vocRight = it.vocRight || []; it.vocLeft = it.vocLeft || [];
     addItem(it, warn);
+    return true;
   }
 
   // tri chronologique automatique quand toutes les dates sont connues
@@ -1682,7 +1687,7 @@ if (typeof module !== "undefined") module.exports = AG;
   }
   async function chooseWatch() {
     try {
-      watchHandle = await window.showDirectoryPicker({ id: "audios", mode: "read", startIn: "downloads" });
+      watchHandle = await window.showDirectoryPicker({ id: "audios", mode: "readwrite", startIn: "downloads" });
     } catch (e) { return; }
     await idbSet("watch", watchHandle);
     seen = new Set(); await idbSet("seen", []);
@@ -1694,13 +1699,13 @@ if (typeof module !== "undefined") module.exports = AG;
     seen = new Set((await idbGet("seen")) || []);
     if (!h) { showWatch("off"); return; }
     watchHandle = h;
-    const perm = await h.queryPermission({ mode: "read" }).catch(() => "denied");
+    const perm = await h.queryPermission({ mode: "readwrite" }).catch(() => "denied");
     if (perm === "granted") startWatch();
     else { showWatch("paused"); status("Cliquez sur ▶ Reprendre pour surveiller à nouveau le dossier des audiogrammes.", "busy"); }
   }
   async function resumeWatch() {
     if (!watchHandle) return chooseWatch();
-    const perm = await watchHandle.requestPermission({ mode: "read" }).catch(() => "denied");
+    const perm = await watchHandle.requestPermission({ mode: "readwrite" }).catch(() => "denied");
     if (perm === "granted") startWatch(); else status("Chrome n'a pas reçu l'autorisation de lire le dossier.", "err");
   }
   async function startWatch() {
@@ -1724,12 +1729,18 @@ if (typeof module !== "undefined") module.exports = AG;
         seen.add(key);
         // au démarrage, on ne reprend que les PDF de moins de 30 minutes
         if (first && f.lastModified < startTime - 30 * 60 * 1000) continue;
-        fresh.push(f);
+        fresh.push({ f, name });
       }
       if (fresh.length) {
         await idbSet("seen", [...seen].slice(-2000));
-        fresh.sort((a, b) => a.lastModified - b.lastModified);
-        for (const f of fresh) await importFile(f, true);
+        fresh.sort((a, b) => a.f.lastModified - b.f.lastModified);
+        for (const { f, name } of fresh) {
+          // une fois importé, le PDF est effacé du dossier de téléchargement
+          if (await importFile(f, true)) {
+            try { await watchHandle.removeEntry(name); }
+            catch (e) { status(`${name} importé, mais n'a pas pu être effacé : ${e.message}`, "err"); }
+          }
+        }
       }
     } catch (e) {
       clearInterval(watchTimer); showWatch("paused");
