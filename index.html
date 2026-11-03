@@ -109,8 +109,8 @@
     <div class="step">2 · Capturer chaque audiogramme</div>
     <button id="btn-capture" class="btn-main" disabled>📷  Capturer l'audiogramme affiché</button>
     <label class="chk"><input type="checkbox" id="delay"> Retardateur 3 s (écran entier partagé)</label>
-    <p class="hint">ou collez une capture (<b>Ctrl+V</b>), glissez une image, ou
-      <label style="text-decoration:underline;cursor:pointer">importez un fichier<input type="file" id="file" accept="image/*" hidden></label>.</p>
+    <p class="hint">ou glissez ici le <b>PDF de l'audiogramme</b> (page entière lue), collez une capture (<b>Ctrl+V</b>), ou
+      <label style="text-decoration:underline;cursor:pointer">choisissez des fichiers<input type="file" id="file" accept="image/*,application/pdf,.pdf" multiple hidden></label>.</p>
   </div>
 
   <div>
@@ -153,6 +153,7 @@
     <label class="chk"><input type="checkbox" id="st-round"> Arrondir au pas de 5 dB</label>
     <label class="chk"><input type="checkbox" id="st-zoom"> Onglet Chrome partagé : dézoomer automatiquement si la page n'est pas entièrement visible</label>
     <button id="st-save" style="margin-top:8px">Enregistrer</button>
+    <button id="st-diag" style="margin-top:8px">Enregistrer la dernière capture (diagnostic)</button>
   </details>
 </aside>
 
@@ -881,7 +882,7 @@ if (typeof module !== "undefined") module.exports = AG;
   const BONE = { right: "boneRight", left: "boneLeft" }, VOC = { right: "vocRight", left: "vocLeft" };
 
   // ------------------------------------------------------------ réglages
-  const S = { ...AG.DEFAULTS, show_air: true, show_bone: false, show_voc: false, auto_zoom: true };
+  const S = { ...AG.DEFAULTS, show_air: true, show_bone: false, show_voc: false, tab_zoom: false };
   try { Object.assign(S, JSON.parse(localStorage.getItem("ag_settings") || "{}")); } catch (e) {}
   const saveS = () => { try { localStorage.setItem("ag_settings", JSON.stringify(S)); } catch (e) {} };
 
@@ -933,6 +934,7 @@ if (typeof module !== "undefined") module.exports = AG;
     }
     video.srcObject = stream;
     await video.play().catch(() => {});
+    OCR.load().catch(() => {});
     const th = $("thumb"); th.srcObject = stream; th.play().catch(() => {});
     const tr = stream.getVideoTracks()[0];
     tr.addEventListener("ended", () => { stream = null; video.srcObject = null; $("thumb").srcObject = null; updateSource(); });
@@ -975,6 +977,7 @@ if (typeof module !== "undefined") module.exports = AG;
   }
 
   async function importBlob(blob) {
+    if (blob.type === "application/pdf" || /\.pdf$/i.test(blob.name || "")) return importPdf(blob);
     try {
       const bmp = await createImageBitmap(blob);
       const cv = document.createElement("canvas");
@@ -982,6 +985,36 @@ if (typeof module !== "undefined") module.exports = AG;
       cv.getContext("2d").drawImage(bmp, 0, 0);
       processCanvas(cv);
     } catch (e) { status("Image illisible.", "err"); }
+  }
+
+  // PDF de l'audiogramme : la page entière est lue, même ce qui ne tient pas à l'écran
+  const PDFJS = Object.assign({ lib: "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs",
+    worker: "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs" }, window.PDFJS_PATHS || {});
+  async function importPdf(file) {
+    status("Ouverture du PDF…", "busy");
+    try {
+      const pdfjs = await import(PDFJS.lib);
+      pdfjs.GlobalWorkerOptions.workerSrc = PDFJS.worker;
+      const doc = await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+      const pages = Math.min(doc.numPages, 4);
+      for (let n = 1; n <= pages; n++) {
+        const page = await doc.getPage(n);
+        const vp = page.getViewport({ scale: 150 / 72 });
+        const cv = document.createElement("canvas");
+        cv.width = Math.round(vp.width); cv.height = Math.round(vp.height);
+        const ctx = cv.getContext("2d"); ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, cv.width, cv.height);
+        await page.render({ canvasContext: ctx, viewport: vp }).promise;
+        await processCanvas(cv);
+      }
+    } catch (e) { status("PDF illisible : " + e.message, "err"); }
+  }
+  function saveLastFrame() {
+    if (!lastFrame) { status("Aucune capture pour l'instant.", "err"); return; }
+    lastFrame.toBlob(b => {
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(b); a.download = "derniere_capture_audiogramme.png";
+      document.body.appendChild(a); a.click(); a.remove();
+    }, "image/png");
   }
 
   const prepCanvas = cv => AG.prep(cv.getContext("2d", { willReadFrequently: true }).getImageData(0, 0, cv.width, cv.height));
@@ -995,7 +1028,7 @@ if (typeof module !== "undefined") module.exports = AG;
   // on dézoome l'onglet le temps de la capture, puis on remet le zoom.
   async function completeByZoom(res) {
     const surf = stream && stream.getVideoTracks()[0].getSettings().displaySurface;
-    if (surf !== "browser" || !controller || !controller.decreaseZoomLevel || !S.auto_zoom) return res;
+    if (surf !== "browser" || !controller || !controller.decreaseZoomLevel || !S.tab_zoom) return res;
     let air = hasAir(res.data) ? { data: res.data, canvas: res.canvas, grids: res.grids } : null;
     let voc = hasVoc(res.data) ? { data: res.data, canvas: res.canvas, vgrid: res.vgrid } : null;
     // la vocale est-elle peut-être coupée en bas de la page ?
@@ -1031,7 +1064,9 @@ if (typeof module !== "undefined") module.exports = AG;
     queue = queue.then(() => processOne(cv)).catch(e => status("Erreur de lecture : " + e.message, "err")).finally(() => { busy--; });
     return queue;
   }
+  let lastFrame = null;
   async function processOne(cv) {
+    lastFrame = cv;
     status("Lecture de l'audiogramme…", "busy");
     await tick();
     let res = AG.analyse(prepCanvas(cv), S);
@@ -1056,9 +1091,11 @@ if (typeof module !== "undefined") module.exports = AG;
     let warn = "";
     if (info.name) {
       const cur = $("patient").value.trim();
+      const surname = s => normName((s || "").split(/\s+/).filter(w => w === w.toUpperCase()).join(" ") || s);
       if (!cur) $("patient").value = info.name;
-      else if (normName(cur) !== normName(info.name) && items.length)
-        warn = ` ⚠ Patient lu : ${info.name}, différent de « ${cur} » — vérifiez qu'il s'agit du même patient !`;
+      else if (surname(cur) !== surname(info.name)) {
+        if (items.length) warn = ` ⚠ Patient lu : ${info.name}, différent de « ${cur} » — vérifiez qu'il s'agit du même patient !`;
+      } else if (info.name.length > cur.length && normName(info.name).startsWith(normName(cur))) $("patient").value = info.name;
     }
     // examen visé : celui de la même date, sinon le dernier importé
     const last = (info.date && items.find(i => i.date === info.date)) || (items.includes(lastAdded) ? lastAdded : null);
@@ -1186,9 +1223,11 @@ if (typeof module !== "undefined") module.exports = AG;
       ctx.drawImage(cv, x0, y0, x1 - x0, y1 - y0, 0, 0, c.width, c.height);
       const w = await load();
       const { data } = await w.recognize(c);
+      api.lastText = data.text || "";
       return parse(data.text || "");
     }
-    return { read, parse, load };
+    const api = { read, parse, load, lastText: "" };
+    return api;
   })();
 
   // ------------------------------------------------------------ vérification / modification
@@ -1735,6 +1774,8 @@ if (typeof module !== "undefined") module.exports = AG;
     document.body.classList.add("pip-open");
     const th = $("thumb"); if (stream) { th.srcObject = stream; th.play().catch(() => {}); }
     pip.document.addEventListener("paste", onPaste);
+    pip.document.addEventListener("dragover", e => e.preventDefault());
+    pip.document.addEventListener("drop", onDrop);
     pip.addEventListener("pagehide", () => {
       const a = pip.document.getElementById("aside");
       document.querySelector(".wrap").prepend(a);
@@ -1749,14 +1790,14 @@ if (typeof module !== "undefined") module.exports = AG;
   // ------------------------------------------------------------ paramètres
   function syncSettingsForm() {
     for (const k of ["db_bottom", "db_step"]) $("st-" + k).value = S[k];
-    $("st-round").checked = !!S.round_5; $("st-zoom").checked = !!S.auto_zoom;
+    $("st-round").checked = !!S.round_5; $("st-zoom").checked = !!S.tab_zoom;
     $("show-air").checked = !!S.show_air; $("show-bone").checked = !!S.show_bone; $("show-voc").checked = !!S.show_voc;
   }
   function saveSettingsForm() {
     for (const k of ["db_bottom", "db_step"]) {
       const v = parseFloat($("st-" + k).value.replace(",", ".")); if (!isNaN(v)) S[k] = v;
     }
-    S.round_5 = $("st-round").checked; S.auto_zoom = $("st-zoom").checked; saveS();
+    S.round_5 = $("st-round").checked; S.tab_zoom = $("st-zoom").checked; saveS();
     status("Paramètres enregistrés.", "ok");
   }
   function onShowChange() {
@@ -1781,7 +1822,8 @@ if (typeof module !== "undefined") module.exports = AG;
   for (const id of ["show-air", "show-bone", "show-voc"]) $(id).onchange = onShowChange;
   $("patient").oninput = () => { invalidate(); schedulePreview(); };
   $("mini-img").onclick = () => { superpose(); if (pip) window.focus(); };
-  $("file").onchange = e => { const f = e.target.files[0]; if (f) importBlob(f); e.target.value = ""; };
+  $("file").onchange = async e => { const fs = [...e.target.files]; e.target.value = ""; for (const f of fs) await importBlob(f); };
+  $("st-diag").onclick = saveLastFrame;
   const g = id => document.getElementById(id);
   g("btn-dl").onclick = download;
   g("btn-open").onclick = () => pdf && window.open(pdf.url, "_blank");
@@ -1797,11 +1839,12 @@ if (typeof module !== "undefined") module.exports = AG;
   window.addEventListener("mouseup", () => { if (drag && drag.x1 != null) manualDone(); else drag = null; });
   document.addEventListener("paste", onPaste);
   document.addEventListener("dragover", e => e.preventDefault());
-  document.addEventListener("drop", e => {
+  document.addEventListener("drop", onDrop);
+  function onDrop(e) {
     e.preventDefault();
-    const f = [...e.dataTransfer.files].find(f => f.type.startsWith("image/"));
-    if (f) importBlob(f);
-  });
+    for (const f of [...e.dataTransfer.files].filter(f => f.type.startsWith("image/") || f.type === "application/pdf" || /\.pdf$/i.test(f.name)))
+      importBlob(f);
+  }
 
   idbGet("dir").then(h => { if (h) dirHandle = h; showFolder(); });
   syncSettingsForm(); renderList(); updateSource(""); show("p-help");
