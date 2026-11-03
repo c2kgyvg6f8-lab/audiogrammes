@@ -8,6 +8,7 @@
   :root { --od:#c62828; --og:#1565c0; --ink:#1d2430; --mute:#667085; --line:#e3e6eb; --bg:#f5f6f8;
           --acc:#0b7a6f; --acc2:#0a6359; --card:#fff; }
   * { box-sizing:border-box; }
+  [hidden] { display:none !important; }
   html,body { margin:0; height:100%; }
   body { font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; color:var(--ink); background:var(--bg); }
   .wrap { display:grid; grid-template-columns:330px 1fr; min-height:100vh; }
@@ -150,6 +151,7 @@
       <span>dB entre deux lignes</span><input id="st-db_step" inputmode="decimal">
     </div>
     <label class="chk"><input type="checkbox" id="st-round"> Arrondir au pas de 5 dB</label>
+    <label class="chk"><input type="checkbox" id="st-zoom"> Onglet Chrome partagé : dézoomer automatiquement si la page n'est pas entièrement visible</label>
     <button id="st-save" style="margin-top:8px">Enregistrer</button>
   </details>
 </aside>
@@ -162,8 +164,10 @@
       <li><b>Choisir la source</b> (une fois par séance) : de préférence la <b>fenêtre</b> du logiciel Doctolib ou d'audiométrie.
         La capture marche même quand cet outil est devant.</li>
       <li>Cliquez sur <b>📌 Au premier plan</b> : les commandes passent dans une petite fenêtre qui reste au-dessus de Doctolib.</li>
-      <li>Affichez un audiogramme, cliquez sur <b>Capturer</b> : il est lu et ajouté directement, sans validation. Tapez sa date dans la
-        liste. ✎ permet de vérifier ou corriger un examen à tout moment.</li>
+      <li>Affichez un audiogramme, cliquez sur <b>Capturer</b> : il est lu et ajouté directement, sans validation. Le <b>nom, le prénom
+        et la date</b> de l'examen sont lus automatiquement sur l'en-tête. ✎ permet de vérifier ou corriger un examen à tout moment.</li>
+      <li>Si la page n'est pas visible en entier : capturez le haut, faites défiler, capturez le bas — les captures du même examen sont
+        <b>regroupées automatiquement</b>. Pour un onglet Chrome partagé, l'outil peut aussi dézoomer l'onglet tout seul le temps de la capture.</li>
       <li>Cochez les courbes à afficher : <b>aérienne</b>, <b>osseuse</b>, <b>vocale</b> (une, deux ou les trois). L'aperçu se met à jour.</li>
       <li><b>Envoyer vers Doctolib</b> crée le PDF et l'écrit dans le dossier d'import (passerelle) de Doctolib.</li>
     </ol>
@@ -845,10 +849,11 @@ const AG = (() => {
   function analyse(P, s) {
     s = { ...DEFAULTS, ...s };
     const cands = findGrids(P);
-    const grids = pickGrids(cands);
-    if (!grids) return { grids: null, data: null };
-    const data = extract(P, grids, s);
-    const vg = findVocale(cands, Object.values(grids));
+    // seules les grilles reconnues comme audiogrammes (fréquences repérées)
+    const valid = cands.filter(g => g.valid);
+    const grids = valid.length ? pickGrids(valid) : null;
+    const data = grids ? extract(P, grids, s) : { right: {}, left: {}, boneRight: {}, boneLeft: {} };
+    const vg = findVocale(cands, grids ? Object.values(grids) : []);
     data.vocRight = vg ? extractVocale(P, vg, "right", s) : [];
     data.vocLeft = vg ? extractVocale(P, vg, "left", s) : [];
     return { grids, data, vgrid: vg };
@@ -876,7 +881,7 @@ if (typeof module !== "undefined") module.exports = AG;
   const BONE = { right: "boneRight", left: "boneLeft" }, VOC = { right: "vocRight", left: "vocLeft" };
 
   // ------------------------------------------------------------ réglages
-  const S = { ...AG.DEFAULTS, show_air: true, show_bone: false, show_voc: false };
+  const S = { ...AG.DEFAULTS, show_air: true, show_bone: false, show_voc: false, auto_zoom: true };
   try { Object.assign(S, JSON.parse(localStorage.getItem("ag_settings") || "{}")); } catch (e) {}
   const saveS = () => { try { localStorage.setItem("ag_settings", JSON.stringify(S)); } catch (e) {} };
 
@@ -981,34 +986,210 @@ if (typeof module !== "undefined") module.exports = AG;
 
   const prepCanvas = cv => AG.prep(cv.getContext("2d", { willReadFrequently: true }).getImageData(0, 0, cv.width, cv.height));
 
-  // Import direct, sans validation : l'audiogramme est ajouté à la liste.
-  function processCanvas(cv) {
-    status("Lecture de l'audiogramme…", "busy");
-    setTimeout(() => {
-      const P = prepCanvas(cv);
-      const { grids, data, vgrid } = AG.analyse(P, S);
-      const label = `Examen ${items.length + 1}`;
-      if (!grids || (!nPts(data.right) && !nPts(data.left))) {
-        current = { canvas: cv, P, grids: null, data: null, vgrid: null, label, editIndex: -1 };
-        openManual("Je n'ai pas trouvé d'audiogramme lisible. Encadrez la grille à la souris.");
-        if (pip) { status("Audiogramme non trouvé : encadrez-le dans l'onglet principal.", "err"); window.focus(); }
-        return;
+  // ------------------------------------------------------------ lecture automatique
+  const hasAir = d => d && (nPts(d.right) || nPts(d.left));
+  const hasVoc = d => d && ((d.vocRight || []).length || (d.vocLeft || []).length);
+  const tick = () => new Promise(r => setTimeout(r, 30));
+
+  // Onglet Chrome partagé : si une partie manque (page pas entièrement visible),
+  // on dézoome l'onglet le temps de la capture, puis on remet le zoom.
+  async function completeByZoom(res) {
+    const surf = stream && stream.getVideoTracks()[0].getSettings().displaySurface;
+    if (surf !== "browser" || !controller || !controller.decreaseZoomLevel || !S.auto_zoom) return res;
+    let air = hasAir(res.data) ? { data: res.data, canvas: res.canvas, grids: res.grids } : null;
+    let voc = hasVoc(res.data) ? { data: res.data, canvas: res.canvas, vgrid: res.vgrid } : null;
+    // la vocale est-elle peut-être coupée en bas de la page ?
+    const cut = air && Math.max(...Object.values(air.grids).map(g => g.y1)) > 0.55 * res.canvas.height;
+    if ((air && voc) || (air && !cut)) return res;
+    let steps = 0;
+    try {
+      while (steps < 3 && !(air && voc)) {
+        await controller.decreaseZoomLevel(); steps++;
+        status("Page partiellement visible : dézoom de l'onglet le temps de la lecture…", "busy");
+        await new Promise(r => setTimeout(r, 600));
+        const cv = await grabFrame();
+        const r2 = AG.analyse(prepCanvas(cv), S);
+        if (!air && hasAir(r2.data)) air = { data: r2.data, canvas: cv, grids: r2.grids };
+        if (!voc && hasVoc(r2.data)) voc = { data: r2.data, canvas: cv, vgrid: r2.vgrid };
       }
-      addItem({ label, ...data, canvas: cv, grids, vgrid });
-    }, 30);
+    } catch (e) { /* zoom refusé ou impossible : on garde la première lecture */ }
+    finally { for (let i = 0; i < steps; i++) { try { await controller.increaseZoomLevel(); } catch (e) { break; } } }
+    if (!steps) return res;
+    const data = { right: {}, left: {}, boneRight: {}, boneLeft: {}, vocRight: [], vocLeft: [] };
+    if (air) for (const k of ["right", "left", "boneRight", "boneLeft"]) data[k] = air.data[k];
+    if (voc) { data.vocRight = voc.data.vocRight; data.vocLeft = voc.data.vocLeft; }
+    return { data, grids: air ? air.grids : null, canvas: air ? air.canvas : res.canvas,
+      vgridV: voc ? voc.vgrid : null, vcanvas: voc ? voc.canvas : null };
   }
 
-  function addItem(it) {
-    items.push(it);
-    invalidate(); renderList(); refreshPreview();
-    const parts = [`CA ${nPts(it.right)}·${nPts(it.left)}`];
-    if (nPts(it.boneRight) || nPts(it.boneLeft)) parts.push(`CO ${nPts(it.boneRight)}·${nPts(it.boneLeft)}`);
-    if (it.vocRight.length || it.vocLeft.length) parts.push(`vocale ${it.vocRight.length}·${it.vocLeft.length}`);
-    status(`✔ ${it.label} importé (${parts.join(" · ")} points OD·OG). Tapez sa date dans la liste ; ✎ pour vérifier.`, "ok");
-    const inp = $("list").querySelectorAll("input.lb");
-    const last = inp[inp.length - 1];
-    if (last) { last.focus(); last.select(); }
+  // Import direct, sans validation. Plusieurs captures du même examen (même
+  // date lue, ou capture ne contenant que la vocale) sont fusionnées.
+  // les captures sont traitées l'une après l'autre (clics rapprochés)
+  let queue = Promise.resolve(), busy = 0;
+  function processCanvas(cv) {
+    busy++;
+    queue = queue.then(() => processOne(cv)).catch(e => status("Erreur de lecture : " + e.message, "err")).finally(() => { busy--; });
+    return queue;
   }
+  async function processOne(cv) {
+    status("Lecture de l'audiogramme…", "busy");
+    await tick();
+    let res = AG.analyse(prepCanvas(cv), S);
+    res.canvas = cv;
+    res = await completeByZoom(res);
+    const data = res.data || { right: {}, left: {}, boneRight: {}, boneLeft: {}, vocRight: [], vocLeft: [] };
+    if (!hasAir(data) && !hasVoc(data)) {
+      current = { canvas: cv, P: null, grids: null, data: null, vgrid: null, label: `Examen ${items.length + 1}`, editIndex: -1 };
+      openManual("Je n'ai pas trouvé d'audiogramme lisible. Encadrez la grille à la souris.");
+      if (pip) { status("Audiogramme non trouvé : encadrez-le dans l'onglet principal.", "err"); window.focus(); }
+      return;
+    }
+    status("Lecture du nom et de la date…", "busy");
+    let info = {};
+    try { info = await OCR.read(res.canvas || cv, res.grids); } catch (e) { info = {}; }
+    place({ ...data, canvas: res.canvas || cv, grids: res.grids, vgrid: res.vgridV || res.vgrid, vcanvas: res.vcanvas || res.canvas || cv }, info);
+  }
+
+  const normName = s => (s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().replace(/[^A-Z]/g, "");
+
+  function place(it, info) {
+    let warn = "";
+    if (info.name) {
+      const cur = $("patient").value.trim();
+      if (!cur) $("patient").value = info.name;
+      else if (normName(cur) !== normName(info.name) && items.length)
+        warn = ` ⚠ Patient lu : ${info.name}, différent de « ${cur} » — vérifiez qu'il s'agit du même patient !`;
+    }
+    // examen visé : celui de la même date, sinon le dernier importé
+    const last = (info.date && items.find(i => i.date === info.date)) || (items.includes(lastAdded) ? lastAdded : null);
+    const sameDate = info.date && last && last.date === info.date;
+    const vocOnly = !hasAir(it) && hasVoc(it);
+    if (last && (sameDate || (vocOnly && !hasVoc(last) && (!info.date || info.date === last.date)))) {
+      // complète l'examen précédent avec ce qui lui manquait
+      const added = [];
+      for (const k of ["right", "left", "boneRight", "boneLeft"])
+        if (!nPts(last[k]) && nPts(it[k])) { last[k] = it[k]; added.push(k); }
+      if (!hasVoc(last) && hasVoc(it)) { last.vocRight = it.vocRight; last.vocLeft = it.vocLeft; last.vcanvas = it.vcanvas; last.vgrid = it.vgrid; added.push("vocale"); }
+      if (!last.grids && it.grids) { last.canvas = it.canvas; last.grids = it.grids; }
+      lastAdded = last;
+      if (!last.date && info.date) { last.date = info.date; if (/^Examen \d+$/.test(last.label)) last.label = info.date; }
+      invalidate(); sortItems(); renderList(); refreshPreview();
+      status((added.length ? `✔ ${last.label} complété (${added.map(k => k === "vocale" ? "vocale" : k.startsWith("bone") ? "osseuse" : "aérienne").join(", ")}).`
+        : `${last.label} : rien de nouveau dans cette capture.`) + warn, warn ? "err" : "ok");
+      return;
+    }
+    it.date = info.date || null;
+    it.label = info.date || `Examen ${items.length + 1}`;
+    it.vocRight = it.vocRight || []; it.vocLeft = it.vocLeft || [];
+    addItem(it, warn);
+  }
+
+  // tri chronologique automatique quand toutes les dates sont connues
+  const dateKey = d => { const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(d || ""); return m ? m[3] + m[2] + m[1] : null; };
+  function sortItems() {
+    if (items.length > 1 && items.every(i => dateKey(i.date))) items.sort((a, b) => dateKey(a.date).localeCompare(dateKey(b.date)));
+  }
+
+  let lastAdded = null;
+  function addItem(it, warn) {
+    items.push(it); lastAdded = it;
+    sortItems();
+    invalidate(); renderList(); refreshPreview();
+    const parts = [`aérienne ${nPts(it.right)}·${nPts(it.left)}`];
+    if (nPts(it.boneRight) || nPts(it.boneLeft)) parts.push(`osseuse ${nPts(it.boneRight)}·${nPts(it.boneLeft)}`);
+    if (it.vocRight.length || it.vocLeft.length) parts.push(`vocale ${it.vocRight.length}·${it.vocLeft.length}`);
+    const tip = it.date ? "" : " Date non lue : tapez-la dans la liste.";
+    status(`✔ ${it.label} importé (${parts.join(", ")} points OD·OG).${tip}` + (warn || ""), warn ? "err" : "ok");
+    if (!it.date) {
+      const idx = items.indexOf(it);
+      const inp = $("list").querySelectorAll("input.lb")[idx];
+      if (inp) { inp.focus(); inp.select(); }
+    }
+  }
+
+  // ------------------------------------------------------------ lecture du nom et de la date (OCR)
+  const OCR = (() => {
+    const P = Object.assign({
+      script: "https://cdn.jsdelivr.net/npm/tesseract.js@7/dist/tesseract.min.js",
+      workerPath: "https://cdn.jsdelivr.net/npm/tesseract.js@7/dist/worker.min.js",
+      corePath: "https://cdn.jsdelivr.net/npm/tesseract.js-core@7/",
+      langPath: "https://cdn.jsdelivr.net/npm/@tesseract.js-data/fra@1.0.0/4.0.0_best_int",
+    }, window.OCR_PATHS || {});
+    let workerP = null;
+    function load() {
+      if (workerP) return workerP;
+      workerP = new Promise((res, rej) => {
+        if (window.Tesseract) return res();
+        const sc = document.createElement("script");
+        sc.src = P.script; sc.onload = res; sc.onerror = () => rej(new Error("OCR indisponible"));
+        document.head.appendChild(sc);
+      }).then(() => Tesseract.createWorker("fra", 1, { workerPath: P.workerPath, corePath: P.corePath, langPath: P.langPath, gzip: true }));
+      workerP.catch(() => { workerP = null; });
+      return workerP;
+    }
+    const MOIS = { janvier: 1, fevrier: 2, mars: 3, avril: 4, mai: 5, juin: 6, juillet: 7, aout: 8, septembre: 9, octobre: 10, novembre: 11, decembre: 12 };
+    const p2 = n => String(n).padStart(2, "0");
+    const cap = w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+    function parse(text) {
+      const out = {};
+      const plain = text.normalize("NFD").replace(/[̀-ͯ]/g, "");
+      const lines = text.split(/\n/), plines = plain.split(/\n/);
+      // nom / prénom
+      let nom = null, prenom = null;
+      plines.forEach((l, i) => {
+        let m = /\bNom\s*(?:de\s+famille)?\s*[:.]?\s+([A-Z][A-Z' -]{1,40})/.exec(l);
+        if (m && !nom && !/naissance/i.test(l)) nom = lines[i].substr(m.index + m[0].length - m[1].length, m[1].length).trim().split(/\s{2,}| (?=[A-Z]{2,}\b.*[a-z])/)[0];
+        m = /\bPr[e]?nom\s*[:.]?\s+([A-Za-z][A-Za-z'-]{1,30})/i.exec(l);
+        if (m && !prenom) prenom = lines[i].substr(m.index + m[0].length - m[1].length, m[1].length);
+      });
+      if (!nom || !prenom) {
+        const f = /([A-Z][A-Z'-]{1,30})_([A-Z][A-Za-z'-]{1,30})_Audiogramme/i.exec(plain);
+        if (f) { nom = nom || f[1]; prenom = prenom || f[2]; }
+      }
+      if (nom) {
+        nom = nom.replace(/\s+[A-Z]$/, "").trim();
+        // garde uniquement les mots en majuscules du nom (un nom composé reste entier)
+        nom = nom.split(/\s+/).filter(w => /^[A-ZÀ-Ý'-]{2,}$/.test(w)).slice(0, 3).join(" ");
+      }
+      if (nom) out.name = nom + (prenom ? " " + cap(prenom) : "");
+      // date de l'examen (jamais celle de naissance)
+      for (const l of plines) {
+        if (/naiss/i.test(l)) continue;
+        const m = /\b(\d{1,2})(?:er)?\s+(janvier|fevrier|mars|avril|mai|juin|juillet|aout|septembre|octobre|novembre|decembre)\s+(\d{4})\b/i.exec(l);
+        if (m) { out.date = `${p2(m[1])}/${p2(MOIS[m[2].toLowerCase()])}/${m[3]}`; break; }
+      }
+      if (!out.date) for (const l of plines) {
+        if (/naiss/i.test(l)) continue;
+        const m = /\b(\d{2})[\/.](\d{2})[\/.](\d{4})\b/.exec(l);
+        if (m && +m[2] >= 1 && +m[2] <= 12) { out.date = `${m[1]}/${m[2]}/${m[3]}`; break; }
+      }
+      if (!out.date) {
+        const m = /Audiogramme_(\d{4})-(\d{2})-(\d{2})/i.exec(plain);
+        if (m) out.date = `${m[3]}/${m[2]}/${m[1]}`;
+      }
+      return out;
+    }
+    async function read(cv, grids) {
+      // zone au-dessus des audiogrammes (en-tête : nom, prénom, date)
+      let x0 = 0, y0 = 0, x1 = cv.width, y1 = cv.height;
+      const gs = grids ? [...new Set(Object.values(grids))] : [];
+      if (gs.length) {
+        const top = Math.min(...gs.map(g => g.y0)), gh = Math.max(...gs.map(g => g.y1 - g.y0));
+        const left = Math.min(...gs.map(g => g.x0)), right = Math.max(...gs.map(g => g.x1)), gw = right - left;
+        y0 = Math.max(0, Math.round(top - 1.8 * gh)); y1 = Math.min(cv.height, Math.round(top + 0.02 * gh));
+        x0 = Math.max(0, Math.round(left - 0.25 * gw)); x1 = Math.min(cv.width, Math.round(right + 0.25 * gw));
+      }
+      const k = (y1 - y0) * (x1 - x0) > 2.5e6 ? 1 : 2;
+      const c = document.createElement("canvas");
+      c.width = (x1 - x0) * k; c.height = (y1 - y0) * k;
+      const ctx = c.getContext("2d"); ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(cv, x0, y0, x1 - x0, y1 - y0, 0, 0, c.width, c.height);
+      const w = await load();
+      const { data } = await w.recognize(c);
+      return parse(data.text || "");
+    }
+    return { read, parse, load };
+  })();
 
   // ------------------------------------------------------------ vérification / modification
   function overlayBox(grids, vgrid, src) {
@@ -1108,11 +1289,13 @@ if (typeof module !== "undefined") module.exports = AG;
       out.vocRight = textToVoc(document.getElementById("rv-voc-r").value);
       out.vocLeft = textToVoc(document.getElementById("rv-voc-l").value);
     } catch (e) { status(`Vocale : « ${e.message} » n'est pas au format dB:% (ex. 55:0, 60:20).`, "err"); return; }
-    const it = { label: document.getElementById("rv-label").value.trim() || "Examen", ...out,
-      canvas: current.canvas, grids: current.grids, vgrid: current.vgrid };
+    const lab = document.getElementById("rv-label").value.trim() || "Examen";
+    const it = { label: lab, date: /^\d{2}\/\d{2}\/\d{4}$/.test(lab) ? lab : current.date || null, ...out,
+      canvas: current.canvas, grids: Object.keys(current.grids || {}).length ? current.grids : null,
+      vgrid: current.vgridOrig || current.vgrid, vcanvas: current.vcanvas || current.canvas };
     if (current.editIndex >= 0) items[current.editIndex] = it; else items.push(it);
     current = null;
-    invalidate(); renderList(); refreshPreview(); show("p-help");
+    sortItems(); invalidate(); renderList(); refreshPreview(); show("p-help");
     status("Modifications enregistrées.", "ok");
   }
 
@@ -1151,7 +1334,7 @@ if (typeof module !== "undefined") module.exports = AG;
     else if (g.blue > 0.0005 && g.red < 0.0005) grids = { left: g };
     else grids = { right: g, left: g };
     const d = AG.extract(current.P, grids, S);
-    const it = { label: current.label, ...d, vocRight: [], vocLeft: [], canvas: current.canvas, grids, vgrid: null };
+    const it = { label: current.label, date: current.date || null, ...d, vocRight: [], vocLeft: [], canvas: current.canvas, grids, vgrid: null, vcanvas: null };
     if (current.editIndex >= 0) { items[current.editIndex] = it; invalidate(); renderList(); refreshPreview(); status("Relu.", "ok"); }
     else addItem(it);
     current = null;
@@ -1169,7 +1352,7 @@ if (typeof module !== "undefined") module.exports = AG;
         <button title="Vérifier / modifier" data-a="edit">✎</button><button title="Supprimer" data-a="del">✕</button></span>`;
       const inp = li.querySelector("input");
       inp.value = it.label;
-      inp.oninput = () => { it.label = inp.value; invalidate(); schedulePreview(); };
+      inp.oninput = () => { it.label = inp.value; if (/^\d{2}\/\d{2}\/\d{4}$/.test(inp.value.trim())) it.date = inp.value.trim(); invalidate(); schedulePreview(); };
       inp.onkeydown = e => { if (e.key === "Enter") inp.blur(); };
       li.title = `Aérienne OD ${nPts(it.right)} · OG ${nPts(it.left)} — osseuse OD ${nPts(it.boneRight)} · OG ${nPts(it.boneLeft)} — vocale OD ${it.vocRight.length} · OG ${it.vocLeft.length}`;
       li.querySelectorAll("button").forEach(b => b.onclick = () => listAction(b.dataset.a, i));
@@ -1184,10 +1367,11 @@ if (typeof module !== "undefined") module.exports = AG;
     else if (a === "del") items.splice(i, 1);
     else if (a === "edit") {
       const it = items[i];
-      current = { canvas: it.canvas, P: null, grids: it.grids, vgrid: it.vgrid, label: it.label, editIndex: i,
+      current = { canvas: it.canvas || it.vcanvas, P: null, grids: it.grids || {}, vgrid: (!it.canvas || it.vcanvas === it.canvas) ? it.vgrid : null,
+        label: it.label, editIndex: i, date: it.date, vcanvas: it.vcanvas, vgridOrig: it.vgrid,
         data: { right: { ...it.right }, left: { ...it.left }, boneRight: { ...it.boneRight }, boneLeft: { ...it.boneLeft },
           vocRight: [...it.vocRight], vocLeft: [...it.vocLeft] } };
-      if (it.grids) showReview(); else openManual();
+      if (it.grids || it.vgrid) showReview(); else openManual();
       if (pip) { status("Vérification ouverte dans l'onglet principal.", "ok"); window.focus(); }
       return;
     } else return;
@@ -1210,7 +1394,6 @@ if (typeof module !== "undefined") module.exports = AG;
   const round1 = v => { const x = v * 10, f = Math.floor(x), d = x - f;
     const r = Math.abs(d - 0.5) < 1e-9 ? (f % 2 === 0 ? f : f + 1) : Math.round(x); return r / 10; };
   const fmt = v => round1(v).toString().replace(".", ",");
-  const DASH = [[], [7, 4], [9, 3, 2, 3], [2, 3]];
   const font = (c, k, sz, bold) => { c.font = `${bold ? "bold " : ""}${sz * k}px Helvetica, Arial, sans-serif`; };
 
   function marker(c, kind, x, y, r, col) {
@@ -1274,8 +1457,10 @@ if (typeof module !== "undefined") module.exports = AG;
     list.forEach((a, i) => {
       const col = shade(ear, n > 1 ? i / (n - 1) : 1);
       const series = [];
-      if (opts.air) series.push({ v: a[ear], mk: ear === "right" ? "O" : "X", dash: both ? [] : DASH[i % 4], lw: 1.8, kind: "CA" });
-      if (opts.bone) series.push({ v: a[BONE[ear]] || {}, mk: ear === "right" ? "[" : "]", dash: both ? [2, 2.5] : DASH[i % 4], lw: both ? 1.2 : 1.8, kind: "CO" });
+      // aérienne : toujours en trait plein ; osseuse : toujours en pointillés,
+      // de la même couleur que l'aérienne du même examen
+      if (opts.air) series.push({ v: a[ear], mk: ear === "right" ? "O" : "X", dash: [], lw: 1.8, kind: "CA" });
+      if (opts.bone) series.push({ v: a[BONE[ear]] || {}, mk: ear === "right" ? "[" : "]", dash: [1.6, 2.4], lw: 1.5, kind: "CO" });
       for (const sr of series) {
         const fs = Object.keys(sr.v).map(Number).sort((p, q) => p - q);
         if (!fs.length) continue;
@@ -1311,7 +1496,7 @@ if (typeof module !== "undefined") module.exports = AG;
       for (const ear of AG.EARS) {
         const pts = a[VOC[ear]] || [];
         if (!pts.length) continue;
-        const col = shade(ear, n > 1 ? i / (n - 1) : 1), dash = DASH[i % 4], mk = ear === "right" ? "O" : "X";
+        const col = shade(ear, n > 1 ? i / (n - 1) : 1), dash = [], mk = ear === "right" ? "O" : "X";
         c.save();
         c.strokeStyle = col; c.lineWidth = 1.6 * k; c.setLineDash(dash.map(d => d * k));
         c.beginPath(); pts.forEach(([d, p], j) => (j ? c.lineTo : c.moveTo).call(c, PX(d), PY(p))); c.stroke();
@@ -1564,14 +1749,14 @@ if (typeof module !== "undefined") module.exports = AG;
   // ------------------------------------------------------------ paramètres
   function syncSettingsForm() {
     for (const k of ["db_bottom", "db_step"]) $("st-" + k).value = S[k];
-    $("st-round").checked = !!S.round_5;
+    $("st-round").checked = !!S.round_5; $("st-zoom").checked = !!S.auto_zoom;
     $("show-air").checked = !!S.show_air; $("show-bone").checked = !!S.show_bone; $("show-voc").checked = !!S.show_voc;
   }
   function saveSettingsForm() {
     for (const k of ["db_bottom", "db_step"]) {
       const v = parseFloat($("st-" + k).value.replace(",", ".")); if (!isNaN(v)) S[k] = v;
     }
-    S.round_5 = $("st-round").checked; saveS();
+    S.round_5 = $("st-round").checked; S.auto_zoom = $("st-zoom").checked; saveS();
     status("Paramètres enregistrés.", "ok");
   }
   function onShowChange() {
@@ -1620,7 +1805,7 @@ if (typeof module !== "undefined") module.exports = AG;
 
   idbGet("dir").then(h => { if (h) dirHandle = h; showFolder(); });
   syncSettingsForm(); renderList(); updateSource(""); show("p-help");
-  window.__app = { importBlob, superpose, send, openPip, get items() { return items; }, get pdf() { return pdf; },
+  window.__app = { get busy() { return busy; }, OCR, importBlob, superpose, send, openPip, get items() { return items; }, get pdf() { return pdf; },
     get pip() { return pip; }, setDir(h) { dirHandle = h; showFolder(); }, processCanvas };
 })();
 
