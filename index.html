@@ -1732,7 +1732,7 @@ if (typeof module !== "undefined") module.exports = AG;
   async function chooseFolder() {
     if (!window.showDirectoryPicker) { status("Ce navigateur ne permet pas d'écrire dans un dossier : utilisez Télécharger.", "err"); return null; }
     try {
-      dirHandle = await window.showDirectoryPicker({ id: "doctolib", mode: "readwrite" });
+      dirHandle = await pickerWin().showDirectoryPicker({ id: "doctolib", mode: "readwrite" });
       await idbSet("dir", dirHandle);
       showFolder();
       return dirHandle;
@@ -1781,10 +1781,17 @@ if (typeof module !== "undefined") module.exports = AG;
     $("btn-resume").hidden = state !== "paused";
     $("btn-watch").textContent = watchHandle ? "Changer…" : "Choisir le dossier…";
   }
+  // le sélecteur de dossier s'ouvre sur la fenêtre visible (la petite fenêtre au
+  // premier plan si elle est ouverte), sinon il peut rester caché derrière
+  const pickerWin = () => (pip && pip.showDirectoryPicker ? pip : window);
   async function chooseWatch() {
     try {
-      watchHandle = await window.showDirectoryPicker({ id: "audios", mode: "readwrite", startIn: "downloads" });
-    } catch (e) { return; }
+      watchHandle = await pickerWin().showDirectoryPicker({ id: "audios", mode: "readwrite", startIn: "downloads" });
+    } catch (e) {
+      if (e.name === "AbortError") status("Aucun dossier choisi. Chrome refuse « Téléchargements » lui-même : choisissez le sous-dossier Audiogrammes (créez-le d'abord).", "err");
+      else status("Choix du dossier impossible : " + e.message, "err");
+      return;
+    }
     await idbSet("watch", watchHandle);
     seen = new Set(); await idbSet("seen", []);
     startTime = Date.now();
