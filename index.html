@@ -130,6 +130,9 @@
   body.popup.pip-open main { display:block; padding:10px; }
   body.popup.big .wrap { display:grid; grid-template-columns:330px 1fr; }
   body.popup.big main { display:block; padding:14px 16px; }
+  #macnote { display:none; }
+  body.mac.tab #macnote { display:block; background:#fff8e1; border-color:#f3dc9b; }
+  body.mac #installnote { display:none !important; }
   @media (max-width: 900px) { .wrap { grid-template-columns:1fr; } aside { border-right:0; border-bottom:1px solid var(--line); } .review { grid-template-columns:1fr; } }
 </style>
 </head>
@@ -201,6 +204,16 @@
         Il aura sa propre icône (et non celle de Chrome) dans la barre des tâches.</li>
       <li>Téléchargez le <a href="Audiogrammes-lanceur.zip">lanceur</a>, dézippez-le et double-cliquez sur <b>Installer.cmd</b> :
         une icône Audiogrammes est créée sur le bureau, et la fenêtre de l'outil reste toujours au premier plan, même au-dessus de Doctolib.</li>
+    </ol>
+  </section>
+  <section id="macnote" class="panel">
+    <b>Installation sur Mac (une seule fois) :</b>
+    <ol style="margin:6px 0 0;padding-left:20px">
+      <li>Dans Chrome, cliquez sur l'icône <b>Installer</b> à droite de la barre d'adresse
+        (ou menu ⋮ › Caster, enregistrer et partager › Installer la page en tant qu'appli…).</li>
+      <li>L'outil apparaît dans le Launchpad et le dossier Applications › Chrome Apps, avec sa propre icône.
+        Ouvrez-le, puis clic droit sur son icône dans le Dock › Options › <b>Garder dans le Dock</b>.</li>
+      <li>À chaque ouverture, un clic dans la fenêtre ouvre la petite fenêtre qui reste au premier plan, au-dessus de Doctolib.</li>
     </ol>
   </section>
   <section id="p-help" class="panel help">
@@ -1899,7 +1912,18 @@ if (typeof module !== "undefined") module.exports = AG;
     document.addEventListener("pointerdown", once, true);
     document.addEventListener("keydown", once, true);
   }
+  // Mac : pas de lanceur ; la fenêtre « au premier plan » de Chrome (ouverte au
+  // premier clic) garde l'outil au-dessus de Doctolib
+  const isMac = /Mac/i.test(navigator.platform || "") || /Macintosh/i.test(navigator.userAgent);
   function setupWindow() {
+    if (isMac) {
+      document.body.classList.add("mac");
+      if (isApp) { document.body.classList.add("popup", "app"); document.title = "Audiogrammes"; }
+      else document.body.classList.add("tab");
+      placeWin(SMALL.w, SMALL.h);
+      armPip();
+      return;
+    }
     if (viaLauncher) {
       document.body.classList.add("popup", "app", "launcher");
       document.title = "Audiogrammes - fenetre";      // titre repéré par le lanceur
