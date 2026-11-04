@@ -1533,6 +1533,62 @@ if (typeof module !== "undefined") module.exports = AG;
     }
   }
 
+  // Tableau des seuils : une ligne par examen et par conduction ; pour chaque
+  // fréquence, deux sous-colonnes OD | OG séparées par un trait gris très léger.
+  function drawAudioTable(c, k, tx, ty, tw, maxH, list, allf, opts) {
+    const lines = [];
+    for (const a of list) for (const [on, kr, kl, typ] of [[opts.air, "right", "left", "CA"], [opts.bone, "boneRight", "boneLeft", "CO"]]) {
+      const vr = a[kr] || {}, vl = a[kl] || {};
+      if (!on || (!nPts(vr) && !nPts(vl))) continue;
+      lines.push({ label: a.label, typ, vr, vl, pr: AG.pta(vr), pl: AG.pta(vl) });
+    }
+    if (!lines.length) return;
+    const groups = [...allf.map(f => ({ name: flabel(f) + " Hz", get: (l, e) => (e === "r" ? l.vr : l.vl)[f] })),
+      { name: "Perte moy.", get: (l, e) => (e === "r" ? l.pr : l.pl) }];
+    const w0 = 58 * k, w1 = 20 * k, sub = (tw - w0 - w1) / (groups.length * 2);
+    const rh = Math.min(13 * k, maxH / (lines.length + 2));
+    const fs = Math.min(7 * k, rh * 0.6);
+    const text = (s, x, y, w, bold, col) => {
+      c.fillStyle = col || "#222"; c.font = `${bold ? "bold " : ""}${fs}px Helvetica, Arial, sans-serif`;
+      c.textAlign = "center"; c.textBaseline = "middle"; c.fillText(s, x + w / 2, y + rh / 2, w - 2);
+    };
+    const hline = (y, col, lw) => { c.strokeStyle = col; c.lineWidth = lw * k; c.beginPath(); c.moveTo(tx, y); c.lineTo(tx + tw, y); c.stroke(); };
+    const vline = (x, y0, y1, col, lw) => { c.strokeStyle = col; c.lineWidth = lw * k; c.beginPath(); c.moveTo(x, y0); c.lineTo(x, y1); c.stroke(); };
+    const yEnd = ty + rh * (lines.length + 2);
+    // fonds : en-tête gris, sous-colonnes OD rosées, OG bleutées
+    c.fillStyle = "#eeeeee"; c.fillRect(tx, ty, tw, rh * 2);
+    groups.forEach((g, i) => {
+      const x = tx + w0 + w1 + i * 2 * sub;
+      c.fillStyle = "#fdf0ef"; c.fillRect(x, ty + rh * 2, sub, yEnd - ty - rh * 2);
+      c.fillStyle = "#eef3fd"; c.fillRect(x + sub, ty + rh * 2, sub, yEnd - ty - rh * 2);
+    });
+    // en-têtes
+    text("Examen", tx, ty + rh / 2, w0, true); text("", tx + w0, ty, w1, true);
+    groups.forEach((g, i) => {
+      const x = tx + w0 + w1 + i * 2 * sub;
+      text(g.name, x, ty, 2 * sub, true);
+      text("OD", x, ty + rh, sub, true, EAR_COL.right); text("OG", x + sub, ty + rh, sub, true, EAR_COL.left);
+    });
+    // lignes
+    lines.forEach((l, j) => {
+      const y = ty + rh * (j + 2);
+      text(l.label, tx, y, w0); text(l.typ, tx + w0, y, w1);
+      groups.forEach((g, i) => {
+        const x = tx + w0 + w1 + i * 2 * sub;
+        const r = g.get(l, "r"), lv = g.get(l, "l");
+        text(r == null ? "–" : fmt(r), x, y, sub); text(lv == null ? "–" : fmt(lv), x + sub, y, sub);
+      });
+    });
+    // traits : bordures normales entre fréquences, trait gris très léger entre OD et OG
+    for (let j = 0; j <= lines.length + 2; j++) if (j !== 1) hline(ty + rh * j, "#bbbbbb", 0.5);
+    c.strokeStyle = "#dddddd"; c.lineWidth = 0.4 * k; c.beginPath(); c.moveTo(tx + w0 + w1, ty + rh); c.lineTo(tx + tw, ty + rh); c.stroke();
+    vline(tx, ty, yEnd, "#bbbbbb", 0.5); vline(tx + w0, ty, yEnd, "#bbbbbb", 0.5); vline(tx + w0 + w1, ty, yEnd, "#bbbbbb", 0.5);
+    groups.forEach((g, i) => {
+      const x = tx + w0 + w1 + i * 2 * sub;
+      vline(x + sub, ty + rh, yEnd, "#e4e4e4", 0.4);
+      vline(x + 2 * sub, ty, yEnd, "#bbbbbb", 0.5);
+    });
+  }
   function drawTable(c, k, tx, ty, tw, maxH, head, rows, widthsFirst) {
     if (!rows.length) return;
     const rh = Math.min(14 * k, maxH / (rows.length + 1));
@@ -1631,8 +1687,8 @@ if (typeof module !== "undefined") module.exports = AG;
       drawChart(c, k, 345 * k, 127 * k, 244 * k, 265 * k, "left", list, rng, o2);
       if (V) {
         drawVocale(c, k, 101 * k, 440 * k, 387 * k, 152 * k, list);
-        drawTable(c, k, 20 * k, 640 * k, 555 * k, 150 * k, head, rows, [62, 20, 20]);
-      } else drawTable(c, k, 20 * k, 440 * k, 555 * k, 330 * k, head, rows, [62, 20, 20]);
+        drawAudioTable(c, k, 20 * k, 640 * k, 555 * k, 150 * k, list, allf, opts);
+      } else drawAudioTable(c, k, 20 * k, 440 * k, 555 * k, 330 * k, list, allf, opts);
     } else if (V) {
       drawVocale(c, k, 60 * k, 127 * k, 500 * k, 265 * k, list);
       drawTable(c, k, 20 * k, 440 * k, 555 * k, 200 * k, ["Examen", "Or.", "Audiométrie vocale"], vrows, [70, 22]);
